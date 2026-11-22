@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "source_url": "https://metrotenerife.com/recorridos-y-horarios/",
+  "retrieved_on": "2026-11-22",
+  "source_note": "Tabla «Horarios o Intervalo de paso» de la web pública de Metrotenerife, leída el 22/11/2026. Los minutos son el intervalo de paso, no un horario de salida. Una celda vacía se guarda como null: esa línea no figura en esa franja.",
+  "calendar_note": "Las temporadas de 2026 son las del párrafo de esa misma página: invierno del 1 de enero al 30 de junio y del 8 de septiembre al 31 de diciembre; verano 1 del 1 al 6 de julio y del 1 al 7 de septiembre; verano 2 del 7 de julio al 31 de agosto. La cabecera de la tabla da otras fechas (invierno desde el 11 de septiembre; verano 1 del 1 al 7 de julio y del 4 al 10 de septiembre; verano 2 del 8 de julio al 3 de septiembre). Este fichero sigue el párrafo etiquetado 2026.",
+  "spacing_note": "Cada franja con servicio reparte salidas uniformes desde su hora de inicio. No se ha copiado el PDF de paso por parada.",
+  "service_hours_note": "La web dice que de lunes a viernes el servicio va de 6:00 a 24:00, y que fines de semana y festivos es ininterrumpido. En la tabla, la línea 2 no tiene intervalo de 00:00 a 06:00 ni sábados ni domingos. El primer y el último paso exactos no vienen en minutos: se toman el inicio y el fin de la franja.",
+  "holiday_note": "Festivos de 2026 usados para elegir la columna domingo/festivo: 1 y 6 de enero, Jueves y Viernes Santo (2 y 3 de abril; Pascua el 5 de abril), 1 de mayo, 30 de mayo (Día de Canarias), 15 de agosto, 12 de octubre, 1 de noviembre, 6 y 8 de diciembre y 25 de diciembre. No incluye fiestas locales de Santa Cruz ni de La Laguna, como el Carnaval. Un festivo que cae en sábado usa la columna de domingo/festivo.",
+  "seasons": [
+    {"name": "invierno", "ranges": [["01-01", "06-30"], ["09-08", "12-31"]]},
+    {"name": "verano_1", "ranges": [["07-01", "07-06"], ["09-01", "09-07"]]},
+    {"name": "verano_2", "ranges": [["07-07", "08-31"]]}
+  ],
+  "holidays_2026": [
+    "2026-01-01",
+    "2026-01-06",
+    "2026-04-02",
+    "2026-04-03",
+    "2026-05-01",
+    "2026-05-30",
+    "2026-08-15",
+    "2026-10-12",
+    "2026-11-01",
+    "2026-12-06",
+    "2026-12-08",
+    "2026-12-25"
+  ],
+  "bands": [
+    {
+      "from_hour": 0,
+      "to_hour": 1,
+      "minutes": {
+        "laborable": {"invierno": [null, null], "verano_1": [null, null], "verano_2": [null, null]},
+        "sabado": [30, null],
+        "domingo_festivo": [20, null]
+      }
+    },
+    {
+      "from_hour": 1,
+      "to_hour": 6,
+      "minutes": {
+        "laborable": {"invierno": [null, null], "verano_1": [null, null], "verano_2": [null, null]},
+        "sabado": [30, null],
+        "domingo_festivo": [30, null]
+      }
+    },
+    {
+      "from_hour": 6,
+      "to_hour": 7,
+      "minutes": {
+        "laborable": {"invierno": [15, 15], "verano_1": [15, 15], "verano_2": [15, 15]},
+        "sabado": [20, 30],
+        "domingo_festivo": [30, 30]
+      }
+    },
+    {
+      "from_hour": 7,
+      "to_hour": 9,
+      "minutes": {
+        "laborable": {"invierno": [5, 10], "verano_1": [6, 12], "verano_2": [7, 14]},
+        "sabado": [20, 20],
+        "domingo_festivo": [30, 30]
+      }
+    },
+    {
+      "from_hour": 9,
+      "to_hour": 10,
+      "minutes": {
+        "laborable": {"invierno": [5, 10], "verano_1": [6, 12], "verano_2": [7, 14]},
+        "sabado": [15, 15],
+        "domingo_festivo": [20, 20]
+      }
+    },
+    {
+      "from_hour": 10,
+      "to_hour": 11,
+      "minutes": {
+        "laborable": {"invierno": [5, 10], "verano_1": [6, 12], "verano_2": [7, 14]},
+        "sabado": [10, 15],
+        "domingo_festivo": [15, 20]
+      }
+    },
+    {
+      "from_hour": 11,
+      "to_hour": 15,
+      "minutes": {
+        "laborable": {"invierno": [5, 10], "verano_1": [6, 12], "verano_2": [7, 14]},
+        "sabado": [10, 15],
+        "domingo_festivo": [12, 15]
+      }
+    },
+    {
+      "from_hour": 15,
+      "to_hour": 20,
+      "minutes": {
+        "laborable": {"invierno": [6, 12], "verano_1": [7, 15], "verano_2": [7, 14]},
+        "sabado": [10, 15],
+        "domingo_festivo": [12, 15]
+      }
+    },
+    {
+      "from_hour": 20,
+      "to_hour": 21,
+      "minutes": {
+        "laborable": {"invierno": [6, 15], "verano_1": [7.5, 15], "verano_2": [7, 14]},
+        "sabado": [10, 15],
+        "domingo_festivo": [12, 15]
+      }
+    },
+    {
+      "from_hour": 21,
+      "to_hour": 22,
+      "minutes": {
+        "laborable": {"invierno": [12, 15], "verano_1": [15, 15], "verano_2": [12, 15]},
+        "sabado": [10, 15],
+        "domingo_festivo": [15, 30]
+      }
+    },
+    {
+      "from_hour": 22,
+      "to_hour": 24,
+      "minutes": {
+        "laborable": {"invierno": [15, 15], "verano_1": [15, 15], "verano_2": [20, 20]},
+        "sabado": [15, 20],
+        "domingo_festivo": [30, 30]
+      }
+    }
+  ]
+}

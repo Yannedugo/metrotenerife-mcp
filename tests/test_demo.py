@@ -25,6 +25,7 @@ async def test_index_is_a_local_spanish_page(api) -> None:
     assert "Tranvía de Tenerife" in html
     assert "Actualizar ahora" in html
     assert "Buscar vehículo" in html
+    assert "Próximas horas" in html
     assert "Vehículo " in html
     assert "Detalle" in html
     assert "60000" in html

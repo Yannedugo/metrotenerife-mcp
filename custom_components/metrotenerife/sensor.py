@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -12,6 +12,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from metrotenerife import Arrival
+from metrotenerife.catalog import load_catalog
+from metrotenerife.forecast import forecast_attributes
 from metrotenerife.models import direction_label
 from metrotenerife.occupancy import OCCUPANCY_MEANING
 
@@ -142,6 +144,21 @@ def _arrival_attribute(arrival: Arrival) -> dict[str, Any]:
     }
 
 
+def _forecast_attribute(subentry: Any, arrivals: list[Arrival]) -> list[dict[str, object]]:
+    """Hasta ocho pasos de las próximas dos horas. No llama a la red."""
+    raw_direction = subentry.data.get(CONF_DIRECTION)
+    direction = int(raw_direction) if raw_direction else None
+    lines = tuple(int(line) for line in subentry.data.get(CONF_LINES) or ())
+    return forecast_attributes(
+        load_catalog(),
+        str(subentry.data.get(CONF_STOP_CODE) or ""),
+        arrivals,
+        datetime.now(UTC),
+        lines=lines,
+        direction=direction,
+    )
+
+
 class _StopSensor(MetrotenerifeStopEntity, SensorEntity):
     def __init__(
         self, coordinator: TranviaCoordinator, subentry_id: str, title: str, stop_code: str
@@ -183,7 +200,7 @@ class NextTramSensor(_StopSensor):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_icon = "mdi:tram"
     _attr_translation_key = "next_tram"
-    _unrecorded_attributes = frozenset({"arrivals"})
+    _unrecorded_attributes = frozenset({"arrivals", "forecast"})
 
     def __init__(
         self, coordinator: TranviaCoordinator, subentry_id: str, title: str, stop_code: str
@@ -234,6 +251,7 @@ class NextTramSensor(_StopSensor):
             "occupancy_meaning": OCCUPANCY_MEANING,
             "arrivals_count": len(arrivals),
             "arrivals": [_arrival_attribute(item) for item in arrivals[:MAX_ARRIVALS_ATTRIBUTE]],
+            "forecast": _forecast_attribute(subentry, arrivals),
             "source_updated_at": arrival.updated_at.isoformat() if arrival else None,
             "fetched_at": data.fetched_at.isoformat() if data else None,
         }

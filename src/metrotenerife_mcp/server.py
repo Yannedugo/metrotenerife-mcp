@@ -28,6 +28,7 @@ from metrotenerife.models import Stop, direction_label
 from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, OperatorRegistry, TranviaOperator
 from metrotenerife.present import (
     ambiguous_payload,
+    forecast_payload,
     proximos_payload,
     stop_payload,
     vehicle_query_payload,
@@ -40,6 +41,8 @@ INSTRUCTIONS = (
     "proximos_tranvias, estado_tranvias e info_vehiculo son datos en vivo: di la hora de "
     "actualización y que la fuente no es una API oficial. El número de vehículo es el que va "
     "pintado en el tranvía; si falta o la fila es vieja, di que es desconocido. "
+    "prevision_tranvias es una previsión teórica: di que no es el horario oficial y distingue "
+    "en_vivo, estimado y previsto. Para una hora futura pasa desde en ISO, hora canaria. "
     "info_lineas es un catálogo estático, no un horario. "
     "De momento el único operador es 'tranvia'; el parámetro operador existe para añadir otros."
 )
@@ -134,6 +137,65 @@ def build_server(**client_kwargs: Any) -> MCPServer:
                 destination=destino,
                 per_direction=por_sentido,
                 notes=notes,
+            )
+        )
+
+    @server.tool(
+        description=(
+            "Previsión teórica de pasos por una parada. No es el horario oficial. "
+            "parada: código (GRA) o nombre (Gracia). sentido: 1 o 2, opcional. "
+            "En la línea 1, 1 va a La Trinidad y 2 a Intercambiador. "
+            "En la línea 2, 1 va a La Cuesta y 2 a Tíncer. "
+            "desde: ISO, sin zona se lee en Canarias; por defecto ahora. hasta (fin exclusive) "
+            "o minutos (duración, por defecto 90, máximo 1440). Cada paso trae hora, linea, "
+            "destino y tipo: en_vivo si lo anuncia el panel, estimado si sale de la posición, "
+            "previsto si solo es el intervalo publicado. Si desde cae en la próxima media hora, "
+            "mezcla esos datos reales. Ejemplo: parada Gracia, sentido 1, "
+            "desde 2026-11-23T07:50:00, minutos 30, para mañana a las 7:50 hacia La Trinidad."
+        )
+    )
+    async def prevision_tranvias(
+        parada: str,
+        sentido: int | None = None,
+        desde: str | None = None,
+        hasta: str | None = None,
+        minutos: int | None = None,
+        linea: int | None = None,
+        operador: str = "tranvia",
+        *,
+        ctx: Context,
+    ) -> str:
+        """Pasos previstos. Los tipos en_vivo y estimado solo aparecen cerca de ahora."""
+        _validate_filters(linea, sentido)
+        registry = _registry(ctx)
+        operator = _operator(registry, operador)
+        try:
+            stop, passages, start, end, mixed, note = await operator.forecast(
+                parada,
+                desde=desde,
+                hasta=hasta,
+                minutos=minutos,
+                line=linea,
+                direction=sentido,
+            )
+        except AmbiguousStopError as err:
+            matches = [match for match in err.matches if isinstance(match, Stop)]
+            return _dump(ambiguous_payload(operator.id, parada, matches, str(err)))
+        except StopNotFoundError as err:
+            raise ToolError(str(err)) from err
+        except ValueError as err:
+            raise ToolError(str(err)) from err
+        except MetrotenerifeError as err:
+            raise ToolError(str(err)) from err
+        return _dump(
+            forecast_payload(
+                operator_id=operator.id,
+                stop=stop,
+                passages=passages,
+                start=start,
+                end=end,
+                mixed=mixed,
+                note=note,
             )
         )
 

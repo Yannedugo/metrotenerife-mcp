@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from metrotenerife.forecast import Passage, load_schedule
 from metrotenerife.models import Arrival, Stop, Vehicle, VehiclePosition, direction_label
 from metrotenerife.occupancy import OCCUPANCY_MEANING, occupancy_texts
 from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, VehicleQuery
@@ -165,6 +166,51 @@ def proximos_payload(
         "mensaje": None if arrivals else "No hay tranvías anunciados con ese filtro.",
         "llegadas": [arrival_payload(arrival) for arrival in arrivals],
         "notas_estimacion": notes or [],
+    }
+
+
+def passage_payload(passage: Passage) -> dict[str, Any]:
+    return {
+        "hora": passage.at.isoformat(),
+        "linea": passage.line,
+        "sentido": passage.direction,
+        "sentido_etiqueta": direction_label(passage.line, passage.direction),
+        "destino": passage.destination_name,
+        "destino_codigo": passage.destination_code,
+        "tipo": passage.kind,
+        "intervalo_minutos": passage.headway_minutes,
+        "segundos_desde_cabecera": passage.travel_seconds,
+        "servicio": passage.service,
+    }
+
+
+def forecast_payload(
+    *,
+    operator_id: str,
+    stop: Stop,
+    passages: list[Passage],
+    start: datetime,
+    end: datetime,
+    mixed: bool,
+    note: str,
+) -> dict[str, Any]:
+    """El objeto de `prevision_tranvias` y de la sección «Próximas horas»."""
+    table = load_schedule().payload
+    return {
+        "aviso": note,
+        "operador": operator_id,
+        "parada": stop_payload(stop),
+        "desde": start.isoformat(),
+        "hasta": end.isoformat(),
+        "mezclado_con_en_vivo": mixed,
+        "mensaje": None if passages else "No hay pasos previstos en esa ventana.",
+        "pasos": [passage_payload(passage) for passage in passages],
+        "limitaciones": [
+            table.get("calendar_note"),
+            table.get("spacing_note"),
+            table.get("service_hours_note"),
+            table.get("holiday_note"),
+        ],
     }
 
 

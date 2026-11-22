@@ -125,6 +125,10 @@ class TranviaOnlineClient:
     async def __aexit__(self, *_exc: object) -> None:
         await self.aclose()
 
+    def now(self) -> datetime:
+        """Reloj de las consultas. Los tests pueden congelarlo."""
+        return self._clock()
+
     async def aclose(self) -> None:
         """Cierra la sesión solo si la creó este cliente."""
         if self._owns_session and self._session is not None and not self._session.closed:
