@@ -125,9 +125,9 @@ class TranviaOnlineClient:
     async def panels(self) -> dict[str, list[Arrival]]:
         """Próximos tranvías de todas las paradas, agrupados por código.
 
-        Una sola petición sirve para varias paradas. La forma exacta del JSON
-        global no está documentada: se acepta una lista plana o un objeto cuyas
-        listas contienen los mismos elementos que el panel de una parada.
+        La captura del 22/11/2026 es una lista plana con los mismos objetos
+        que el panel de una parada. También se acepta un objeto cuyas listas
+        tengan esa forma, por si el endpoint cambia el envoltorio.
         """
         payload = await self._get_json("/api/infoStops/infoPanel")
         grouped: dict[str, list[Arrival]] = {}

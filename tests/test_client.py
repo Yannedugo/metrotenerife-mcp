@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 import aiohttp
 import pytest
 
+from metrotenerife.catalog import load_catalog
 from metrotenerife.client import (
     TranviaOnlineClient,
     filter_arrivals,
@@ -16,6 +17,7 @@ from metrotenerife.client import (
     parse_vehicles,
 )
 from metrotenerife.errors import HttpStatusError, ParseError, RequestTimeoutError, StopNotFoundError
+from metrotenerife.operators import label_arrival
 
 FROZEN = datetime(2026, 11, 22, 14, 7, tzinfo=UTC)
 
@@ -92,11 +94,46 @@ async def test_retries_exhausted_raise_http_status(api) -> None:
     assert caught.value.status == 500
 
 
+def test_real_all_panels_filter_by_stop_line_and_direction(fixture) -> None:
+    """La captura real del 22/11/2026 agrupa y filtra por parada, línea y sentido."""
+    catalog = load_catalog()
+    arrivals = [
+        label_arrival(item, catalog) for item in parse_arrivals(fixture("info_panel_all.json"))
+    ]
+    assert len(arrivals) == 100
+    by_stop: dict[str, list] = {}
+    for arrival in arrivals:
+        by_stop.setdefault(arrival.stop_code, []).append(arrival)
+    assert set(by_stop) == {stop.code for stop in catalog.stops}
+
+    to_trinidad = filter_arrivals(by_stop["CAR"], line=1, direction=1)
+    assert [item.minutes for item in to_trinidad] == [10, 20]
+    assert {item.destination_name for item in to_trinidad} == {"La Trinidad"}
+    assert to_trinidad[0].updated_at == datetime(2026, 11, 22, 14, 42, 30, tzinfo=UTC)
+
+    to_tincer = filter_arrivals(by_stop["CAR"], line=2, direction=2)
+    assert [item.minutes for item in to_tincer] == [8, 22]
+    assert {item.destination_name for item in to_tincer} == {"Tíncer"}
+
+    assert filter_arrivals(by_stop["INT"], line=1, direction=2) == []
+    assert [item.minutes for item in filter_arrivals(by_stop["INT"], destination="trinidad")] == [
+        10,
+        20,
+    ]
+
+    arriving = filter_arrivals(by_stop["FUN"], line=1, direction=1)
+    assert arriving[0].minutes == 0
+    assert arriving[0].service == "408"
+
+
 async def test_all_panels_group_stops(api) -> None:
     async with _client(api) as client:
         grouped = await client.panels()
-    assert set(grouped) == {"INT", "CAR"}
-    assert [item.minutes for item in grouped["CAR"]] == [2, 4, 9]
+    assert len(grouped) == 25
+    assert [item.minutes for item in grouped["INT"]] == [10, 20]
+    cardonal = filter_arrivals(grouped["CAR"], line=2, direction=2)
+    assert [item.destination_code for item in cardonal] == ["TIN", "TIN"]
+    assert [item.minutes for item in cardonal] == [8, 22]
 
 
 async def test_dict_shaped_payload_is_accepted() -> None:

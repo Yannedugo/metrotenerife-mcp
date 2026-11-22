@@ -28,6 +28,9 @@ def test_versions_match() -> None:
     const = (ROOT / "custom_components/metrotenerife/const.py").read_text(encoding="utf-8")
     assert manifest["version"] == __version__ == pyproject["project"]["version"]
     assert f'VERSION = "{__version__}"' in const
+    keys = list(manifest)
+    assert keys[:2] == ["domain", "name"]
+    assert keys[2:] == sorted(keys[2:])
 
 
 def test_translations_have_the_same_keys() -> None:
@@ -47,3 +50,12 @@ def test_vendored_library_matches_source() -> None:
     import sync_vendor
 
     assert sync_vendor.check() == 0
+
+
+def test_hacs_structure() -> None:
+    import sys
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import validate_hacs
+
+    assert validate_hacs.check() == 0

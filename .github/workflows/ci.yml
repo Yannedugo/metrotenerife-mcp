@@ -33,7 +33,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: hacs/action@main
+
+      # hacs/action descarga el repo como público y rechaza los privados.
+      # Estas comprobaciones cubren la estructura. La action entra al publicarlo.
+      - name: Validar estructura HACS
+        run: python3 scripts/validate_hacs.py
+
+      - name: HACS Action
+        if: github.event.repository.visibility == 'public'
+        uses: hacs/action@main
         with:
           category: integration
 

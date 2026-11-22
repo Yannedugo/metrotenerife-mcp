@@ -1,6 +1,7 @@
 {
   "domain": "metrotenerife",
   "name": "Tranvía de Tenerife",
+  "categories": ["vehicles_transport.public_transport"],
   "codeowners": ["@Yannedugo"],
   "config_flow": true,
   "documentation": "https://github.com/Yannedugo/metrotenerife-mcp",
@@ -9,6 +10,5 @@
   "issue_tracker": "https://github.com/Yannedugo/metrotenerife-mcp/issues",
   "requirements": [],
   "single_config_entry": true,
-  "version": "0.1.0",
-  "categories": ["vehicles_transport.public_transport"]
+  "version": "0.1.0"
 }

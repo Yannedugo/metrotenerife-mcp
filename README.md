@@ -239,9 +239,9 @@ python scripts/build_catalog.py ruta/google_transit.zip
 python scripts/sync_vendor.py
 ```
 
-El workflow de GitHub Actions ejecuta ruff, la comprobación de la copia vendorizada, pytest, la validación de HACS y hassfest.
+El workflow de GitHub Actions ejecuta ruff, la comprobación de la copia vendorizada, pytest y hassfest. La action oficial de HACS solo valida repositorios públicos; mientras este lo sea privado, el job `hacs` ejecuta `scripts/validate_hacs.py`. Al publicarlo, el mismo job añade `hacs/action`.
 
-Las fixtures reproducen el esquema comprobado el 22 de noviembre de 2026 (panel de Intercambiador, posición de un vehículo, ocupación y catálogo de paradas). Desde el entorno en el que se escribió este código, el handshake TLS con `tranviaonline.metrotenerife.com` no llegó a completarse, así que no hay una grabación en vivo de ese día hecha aquí. Las filas de más —una segunda llegada, El Cardonal con las dos líneas, una ocupación vieja— usan los mismos campos para poder probar filtros y el descarte de datos antiguos. El cliente acepta el panel global como lista plana o como objeto de listas, porque esa respuesta concreta no se pudo volver a leer.
+`tests/fixtures/info_panel_all.json` es la respuesta real de `GET /api/infoStops/infoPanel` del 22 de noviembre de 2026, sobre las 14:42 (hora canaria): una lista plana de 100 llegadas, con el mismo esquema que el panel de una parada. Cubre las 25 paradas y los dos sentidos de cada línea. El panel de una sola parada, las posiciones y la ocupación siguen el esquema verificado ese mismo día; algunas filas extra sirven para probar el descarte de ocupación vieja.
 
 ## Licencia
 
@@ -252,5 +252,4 @@ Código bajo [MIT](LICENSE). El catálogo derivado sigue siendo CC BY 4.0 del Ca
 - Publicar el paquete `metrotenerife` en PyPI y dejar de vendorizarlo cuando el repositorio sea público.
 - Operador de TITSA, enchufado en el registro, cuando se haga el mismo trabajo de fuentes que con el tranvía.
 - Sustituir el catálogo cuando haya un GTFS vigente. El actual no sirve para horarios.
-- Comprobar en una red que sí complete el TLS con TranvíaOnline que el panel de todas las paradas sigue teniendo la forma que el cliente acepta.
 - Tarjeta Lovelace propia, al estilo de una marquesina. Con los sensores de hora y el atributo `arrivals` no hace falta para usarlo.

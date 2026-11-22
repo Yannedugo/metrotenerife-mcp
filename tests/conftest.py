@@ -37,7 +37,7 @@ async def api(fixture):
 
     async def panel_all(_request: web.Request) -> web.Response:
         hits.append("all")
-        return web.json_response(fixture("info_panel_int.json") + fixture("info_panel_car.json"))
+        return web.json_response(fixture("info_panel_all.json"))
 
     async def panel_bad(_request: web.Request) -> web.Response:
         hits.append("bad")
