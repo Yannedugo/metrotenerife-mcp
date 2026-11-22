@@ -25,13 +25,9 @@ from metrotenerife.errors import (
     OperatorNotFoundError,
     StopNotFoundError,
 )
-from metrotenerife.models import Arrival, Stop, Vehicle, direction_label
-from metrotenerife.operators import (
-    AVISO_CATALOGO,
-    AVISO_EN_VIVO,
-    OperatorRegistry,
-    TranviaOperator,
-)
+from metrotenerife.models import Stop, Vehicle, direction_label
+from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, OperatorRegistry, TranviaOperator
+from metrotenerife.present import ambiguous_payload, proximos_payload, stop_payload
 
 INSTRUCTIONS = (
     "Servidor no oficial de tiempos en vivo del Tranvía de Tenerife (Metrotenerife). "
@@ -79,7 +75,7 @@ def build_server(**client_kwargs: Any) -> MCPServer:
                 "aviso": AVISO_CATALOGO,
                 "operador": operator.id,
                 "consulta": consulta,
-                "paradas": [_stop_payload(stop) for stop in stops],
+                "paradas": [stop_payload(stop) for stop in stops],
             }
         )
 
@@ -107,34 +103,22 @@ def build_server(**client_kwargs: Any) -> MCPServer:
                 parada, line=linea, direction=sentido, destination=destino
             )
         except AmbiguousStopError as err:
-            return _dump(
-                {
-                    "aviso": AVISO_CATALOGO,
-                    "operador": operator.id,
-                    "ambiguo": True,
-                    "consulta": parada,
-                    "mensaje": str(err),
-                    "paradas": [
-                        _stop_payload(match) for match in err.matches if isinstance(match, Stop)
-                    ],
-                }
-            )
+            matches = [match for match in err.matches if isinstance(match, Stop)]
+            return _dump(ambiguous_payload(operator.id, parada, matches, str(err)))
         except StopNotFoundError as err:
             raise ToolError(str(err)) from err
         except MetrotenerifeError as err:
             raise ToolError(str(err)) from err
-        updated = [arrival.updated_at for arrival in arrivals]
         return _dump(
-            {
-                "aviso": AVISO_EN_VIVO,
-                "operador": operator.id,
-                "obtenido_a": fetched_at.isoformat(),
-                "actualizacion_fuente": max(updated).isoformat() if updated else None,
-                "parada": _stop_payload(stop),
-                "filtros": {"linea": linea, "sentido": sentido, "destino": destino},
-                "mensaje": None if arrivals else "No hay tranvías anunciados con ese filtro.",
-                "llegadas": [_arrival_payload(arrival) for arrival in arrivals],
-            }
+            proximos_payload(
+                operator_id=operator.id,
+                stop=stop,
+                arrivals=arrivals,
+                fetched_at=fetched_at,
+                line=linea,
+                direction=sentido,
+                destination=destino,
+            )
         )
 
     @server.tool(
@@ -254,34 +238,6 @@ def _validate_filters(line: int | None, direction: int | None) -> None:
         raise ToolError("La línea tiene que ser 1 o 2.")
     if direction is not None and direction not in (1, 2):
         raise ToolError("El sentido tiene que ser 1 o 2.")
-
-
-def _stop_payload(stop: Stop) -> dict[str, Any]:
-    return {
-        "codigo": stop.code,
-        "nombre": stop.name,
-        "lat": stop.lat,
-        "lon": stop.lon,
-        "lineas": list(stop.lines),
-        "gtfs_id": stop.gtfs_id,
-        "descripcion": stop.description,
-    }
-
-
-def _arrival_payload(arrival: Arrival) -> dict[str, Any]:
-    return {
-        "linea": arrival.line,
-        "sentido": arrival.direction,
-        "sentido_etiqueta": direction_label(arrival.line, arrival.direction),
-        "destino": arrival.destination_name,
-        "destino_codigo": arrival.destination_code,
-        "minutos": arrival.minutes,
-        "llegando": arrival.minutes == 0,
-        "llegada_estimada": arrival.estimated_arrival.isoformat(),
-        "servicio": arrival.service,
-        "actualizado": arrival.updated_at.isoformat(),
-        "aproximado": arrival.approximate,
-    }
 
 
 def _vehicle_payload(vehicle: Vehicle) -> dict[str, Any]:

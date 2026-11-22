@@ -38,7 +38,47 @@ flowchart LR
 | --- | --- |
 | `src/metrotenerife` | Librería asyncio. Catálogo, cliente HTTP, modelos y registro de operadores. |
 | `src/metrotenerife_mcp` | Servidor MCP. stdio para usarlo en local y HTTP streamable para alojarlo. |
+| `src/metrotenerife_demo` | Página local para contrastar los tiempos con TranvíaOnline. |
 | `custom_components/metrotenerife` | Integración de Home Assistant. La librería va vendorizada en `vendor/`. |
+
+## Probarlo en local
+
+La página usa la misma librería que el servidor MCP. Sirve para mirar los minutos al lado del panel oficial de TranvíaOnline.
+
+Hace falta Python 3.11 o más nuevo. No hace falta saber qué es un entorno virtual: el comando crea una carpeta `.venv` con su propia copia de Python, sin tocar el resto del ordenador. Abre una terminal en la carpeta del proyecto (en Windows, la carpeta donde está este README).
+
+### Windows
+
+1. Comprueba Python. En PowerShell o en el Símbolo del sistema: `py --version`. Si no reconoce `py`, prueba `python --version`. Tiene que decir 3.11 o más.
+2. Crea la carpeta del entorno: `py -m venv .venv` (o `python -m venv .venv`).
+3. Instala el proyecto: `.venv\Scripts\python -m pip install -e .`
+4. Arranca la página: `.venv\Scripts\metrotenerife-demo`
+5. Abre el navegador en [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+### macOS
+
+1. Abre Terminal, entra en la carpeta del proyecto y comprueba Python: `python3 --version`. Tiene que decir 3.11 o más.
+2. Crea la carpeta del entorno: `python3 -m venv .venv`
+3. Instala el proyecto: `.venv/bin/python -m pip install -e .`
+4. Arranca la página: `.venv/bin/metrotenerife-demo`
+5. Abre el navegador en [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+### Linux
+
+Los mismos pasos que en macOS:
+
+```bash
+python3 --version
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/metrotenerife-demo
+```
+
+Luego abre [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+Elige una parada, o escribe parte del nombre. La lista se refresca sola cada 60 segundos y también con **Actualizar ahora**. El enlace **Ver en TranvíaOnline** abre el panel oficial de esa parada para comparar los minutos. Al final de la página está el JSON que devolvería la herramienta `proximos_tranvias` a un agente. Para cerrar el programa, vuelve a la terminal y pulsa Ctrl+C.
+
+Si el puerto 8000 está ocupado: `metrotenerife-demo --port 8001` y abre `http://127.0.0.1:8001`. En Windows el comando es `.venv\Scripts\metrotenerife-demo --port 8001`.
 
 ## Librería
 
@@ -98,16 +138,25 @@ Sentidos habituales, que en las terminales a veces no cuadran con el panel:
 | 1 | Hacia La Trinidad | Hacia Intercambiador |
 | 2 | Hacia La Cuesta | Hacia Tíncer |
 
-### Probarlo en local
+### Arrancar el servidor para un agente
+
+Con el entorno del apartado [Probarlo en local](#probarlo-en-local) ya creado, instala también el extra del MCP y arranca el servidor.
+
+macOS y Linux:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[mcp]"
-metrotenerife-mcp
+.venv/bin/python -m pip install -e ".[mcp]"
+.venv/bin/metrotenerife-mcp
 ```
 
-Eso habla por la entrada y salida estándar y no imprime nada en stdout: es lo que espera un cliente MCP.
+Windows:
+
+```bat
+.venv\Scripts\python -m pip install -e ".[mcp]"
+.venv\Scripts\metrotenerife-mcp
+```
+
+Eso habla por la entrada y salida estándar y no imprime nada: es lo que espera un cliente MCP.
 
 Claude Desktop, en `claude_desktop_config.json`:
 
