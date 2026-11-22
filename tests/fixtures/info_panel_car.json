@@ -1,0 +1,44 @@
+[
+  {
+    "service": "410",
+    "stop": "CAR",
+    "stopSAE": 4,
+    "destinationStop": "TRI",
+    "stopDescription": "EL CARDONAL",
+    "destinationStopDescription": "LA TRINIDAD",
+    "route": 1,
+    "direction": 1,
+    "lastUpdate": 1795356414000,
+    "lastUpdateFormatted": "22/11/2026 14:06:54",
+    "remainingMinutes": 4,
+    "orderStop": 13
+  },
+  {
+    "service": "409",
+    "stop": "CAR",
+    "stopSAE": 4,
+    "destinationStop": "TIN",
+    "stopDescription": "EL CARDONAL",
+    "destinationStopDescription": "TINCER",
+    "route": 2,
+    "direction": 2,
+    "lastUpdate": 1795356410000,
+    "lastUpdateFormatted": "22/11/2026 14:06:50",
+    "remainingMinutes": 2,
+    "orderStop": 4
+  },
+  {
+    "service": "411",
+    "stop": "CAR",
+    "stopSAE": 4,
+    "destinationStop": "CUE",
+    "stopDescription": "EL CARDONAL",
+    "destinationStopDescription": "LA CUESTA",
+    "route": 2,
+    "direction": 1,
+    "lastUpdate": 1795356410000,
+    "lastUpdateFormatted": "22/11/2026 14:06:50",
+    "remainingMinutes": 9,
+    "orderStop": 3
+  }
+]

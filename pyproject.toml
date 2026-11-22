@@ -1,0 +1,56 @@
+[project]
+name = "metrotenerife"
+version = "0.1.0"
+description = "Tiempos en vivo del Tranvía de Tenerife, servidor MCP e integración de Home Assistant"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Yann Favier" }]
+keywords = ["metrotenerife", "tranvia", "tenerife", "mcp", "home-assistant"]
+dependencies = ["aiohttp>=3.9", "certifi>=2024.8.30"]
+
+[project.optional-dependencies]
+mcp = ["mcp>=2,<3"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "ruff>=0.8"]
+
+[project.scripts]
+metrotenerife-mcp = "metrotenerife_mcp.__main__:main"
+metrotenerife-demo = "metrotenerife_demo.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/Yannedugo/metrotenerife-mcp"
+Issues = "https://github.com/Yannedugo/metrotenerife-mcp/issues"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+metrotenerife = ["py.typed", "data/*.json"]
+metrotenerife_demo = ["index.html"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests", "custom_components", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"custom_components/metrotenerife/__init__.py" = ["E402"]
+"custom_components/metrotenerife/config_flow.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["metrotenerife", "metrotenerife_demo", "metrotenerife_mcp", "custom_components"]
+
+[tool.ruff.format]
+quote-style = "double"

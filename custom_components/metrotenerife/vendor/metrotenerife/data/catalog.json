@@ -1,0 +1,487 @@
+{
+  "version": 1,
+  "attribution": {
+    "title": "GTFS Metropolitano de Tenerife",
+    "publisher": "Cabildo Insular de Tenerife / Metropolitano de Tenerife",
+    "license": "CC BY 4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/",
+    "sources": [
+      "https://datos.tenerife.es/ckan/dataset/4b83e018-37d9-40a6-b6d1-1df2b91c8117",
+      "https://metrotenerife.com/transit/google_transit.zip"
+    ],
+    "feed_start": "20240908",
+    "feed_end": "20250715",
+    "derived_on": "2026-11-22",
+    "note": "Catálogo derivado (paradas, coordenadas, líneas, orden y minutos entre paradas consecutivas). Esos minutos solo sirven para estimar un tranvía que la API no anuncia; no son un horario. Se han restituido tildes que el CSV oficial omite. El feed está caducado. Los sentidos son los de TranvíaOnline."
+  },
+  "lines": [
+    {
+      "code": "L1",
+      "name": "Línea 1",
+      "description": "Santa Cruz – La Laguna",
+      "line": 1,
+      "directions": [
+        {
+          "line": 1,
+          "direction": 1,
+          "destination_code": "TRI",
+          "destination_name": "La Trinidad",
+          "stop_codes": [
+            "INT",
+            "FUN",
+            "GUI",
+            "WEY",
+            "PAZ",
+            "ZUR",
+            "CRS",
+            "CON",
+            "CHI",
+            "PPE",
+            "CAN",
+            "TAC",
+            "CAR",
+            "HOS",
+            "MAN",
+            "GUA",
+            "GRA",
+            "MCI",
+            "CPI",
+            "ANC",
+            "TRI"
+          ],
+          "segment_seconds": [
+            120,
+            120,
+            120,
+            60,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            60,
+            120,
+            60,
+            120,
+            120
+          ],
+          "gtfs_trip_id": "IT"
+        },
+        {
+          "line": 1,
+          "direction": 2,
+          "destination_code": "INT",
+          "destination_name": "Intercambiador",
+          "stop_codes": [
+            "TRI",
+            "ANC",
+            "CPI",
+            "MCI",
+            "GRA",
+            "GUA",
+            "MAN",
+            "HOS",
+            "CAR",
+            "TAC",
+            "CAN",
+            "PPE",
+            "CHI",
+            "CON",
+            "CRS",
+            "ZUR",
+            "PAZ",
+            "WEY",
+            "GUI",
+            "FUN",
+            "INT"
+          ],
+          "segment_seconds": [
+            120,
+            120,
+            60,
+            120,
+            60,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            60,
+            120,
+            120,
+            120
+          ],
+          "gtfs_trip_id": "TI"
+        }
+      ]
+    },
+    {
+      "code": "L2",
+      "name": "Línea 2",
+      "description": "La Cuesta – Tíncer",
+      "line": 2,
+      "directions": [
+        {
+          "line": 2,
+          "direction": 1,
+          "destination_code": "CUE",
+          "destination_name": "La Cuesta",
+          "stop_codes": [
+            "TIN",
+            "JER",
+            "CAR",
+            "HOS",
+            "ING",
+            "CUE"
+          ],
+          "segment_seconds": [
+            120,
+            120,
+            120,
+            120,
+            120
+          ],
+          "gtfs_trip_id": "TL"
+        },
+        {
+          "line": 2,
+          "direction": 2,
+          "destination_code": "TIN",
+          "destination_name": "Tíncer",
+          "stop_codes": [
+            "CUE",
+            "ING",
+            "HOS",
+            "CAR",
+            "JER",
+            "TIN"
+          ],
+          "segment_seconds": [
+            60,
+            120,
+            120,
+            120,
+            120
+          ],
+          "gtfs_trip_id": "LT"
+        }
+      ]
+    }
+  ],
+  "stops": [
+    {
+      "code": "INT",
+      "gtfs_id": "01",
+      "name": "Intercambiador",
+      "description": "Parada y Oficina Comercial del Metropolitano",
+      "lat": 28.45893894,
+      "lon": -16.25105038,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "FUN",
+      "gtfs_id": "02",
+      "name": "Fundación",
+      "description": null,
+      "lat": 28.46451144,
+      "lon": -16.2482308,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "GUI",
+      "gtfs_id": "03",
+      "name": "Teatro Guimerá",
+      "description": null,
+      "lat": 28.46628303,
+      "lon": -16.2516372,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "WEY",
+      "gtfs_id": "04",
+      "name": "Weyler",
+      "description": null,
+      "lat": 28.46731878,
+      "lon": -16.2557679,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "PAZ",
+      "gtfs_id": "05",
+      "name": "La Paz",
+      "description": null,
+      "lat": 28.46775658,
+      "lon": -16.26066277,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "ZUR",
+      "gtfs_id": "06",
+      "name": "Puente Zurita",
+      "description": null,
+      "lat": 28.46784198,
+      "lon": -16.26474376,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "CRS",
+      "gtfs_id": "07",
+      "name": "Cruz del Señor",
+      "description": null,
+      "lat": 28.46435389,
+      "lon": -16.27203173,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "CON",
+      "gtfs_id": "08",
+      "name": "Conservatorio",
+      "description": null,
+      "lat": 28.46206183,
+      "lon": -16.27783832,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "CHI",
+      "gtfs_id": "09",
+      "name": "Chimisay",
+      "description": null,
+      "lat": 28.45734859,
+      "lon": -16.28118555,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "PPE",
+      "gtfs_id": "10",
+      "name": "Príncipes de España",
+      "description": null,
+      "lat": 28.45330559,
+      "lon": -16.28503032,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "CAN",
+      "gtfs_id": "11",
+      "name": "Hospital La Candelaria",
+      "description": null,
+      "lat": 28.44907883,
+      "lon": -16.28694351,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "TAC",
+      "gtfs_id": "12",
+      "name": "Taco",
+      "description": null,
+      "lat": 28.44692754,
+      "lon": -16.29543796,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "CAR",
+      "gtfs_id": "13",
+      "name": "El Cardonal",
+      "description": "Parada con transbordo Línea 1 y 2",
+      "lat": 28.45167366,
+      "lon": -16.29374333,
+      "wheelchair": true,
+      "lines": [
+        1,
+        2
+      ]
+    },
+    {
+      "code": "HOS",
+      "gtfs_id": "14",
+      "name": "Hospital Universitario",
+      "description": "Parada con transbordo Línea 1 y 2",
+      "lat": 28.45757884,
+      "lon": -16.29273265,
+      "wheelchair": true,
+      "lines": [
+        1,
+        2
+      ]
+    },
+    {
+      "code": "MAN",
+      "gtfs_id": "15",
+      "name": "Las Mantecas",
+      "description": null,
+      "lat": 28.46359628,
+      "lon": -16.29690095,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "GUA",
+      "gtfs_id": "16",
+      "name": "Campus Guajara",
+      "description": null,
+      "lat": 28.46874336,
+      "lon": -16.30216762,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "GRA",
+      "gtfs_id": "17",
+      "name": "Gracia",
+      "description": null,
+      "lat": 28.47338359,
+      "lon": -16.30543852,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "MCI",
+      "gtfs_id": "18",
+      "name": "Museo de la Ciencia",
+      "description": null,
+      "lat": 28.47636654,
+      "lon": -16.30921226,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "CPI",
+      "gtfs_id": "19",
+      "name": "Cruz de Piedra",
+      "description": null,
+      "lat": 28.4796278,
+      "lon": -16.31230388,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "ANC",
+      "gtfs_id": "20",
+      "name": "Padre Anchieta",
+      "description": null,
+      "lat": 28.480847,
+      "lon": -16.316764,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "TRI",
+      "gtfs_id": "21",
+      "name": "La Trinidad",
+      "description": "Parada y Oficina Comercial del Metropolitano",
+      "lat": 28.48579349,
+      "lon": -16.31643223,
+      "wheelchair": true,
+      "lines": [
+        1
+      ]
+    },
+    {
+      "code": "CUE",
+      "gtfs_id": "22",
+      "name": "La Cuesta",
+      "description": "Parada Final",
+      "lat": 28.46707,
+      "lon": -16.28602,
+      "wheelchair": true,
+      "lines": [
+        2
+      ]
+    },
+    {
+      "code": "ING",
+      "gtfs_id": "23",
+      "name": "Ingenieros",
+      "description": null,
+      "lat": 28.46235,
+      "lon": -16.29104,
+      "wheelchair": true,
+      "lines": [
+        2
+      ]
+    },
+    {
+      "code": "JER",
+      "gtfs_id": "24",
+      "name": "San Jerónimo",
+      "description": null,
+      "lat": 28.44787,
+      "lon": -16.29814,
+      "wheelchair": true,
+      "lines": [
+        2
+      ]
+    },
+    {
+      "code": "TIN",
+      "gtfs_id": "26",
+      "name": "Tíncer",
+      "description": null,
+      "lat": 28.44376,
+      "lon": -16.30459,
+      "wheelchair": true,
+      "lines": [
+        2
+      ]
+    }
+  ]
+}

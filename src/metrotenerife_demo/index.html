@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tranvía de Tenerife</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --verde: #0b6b4f;
+      --verde-oscuro: #084b38;
+      --papel: #f4f7f5;
+      --tarjeta: #ffffff;
+      --texto: #1c2b26;
+      --suave: #5c6f68;
+      --linea: #d5e2dc;
+      --aviso: #fff6e8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--papel);
+      color: var(--texto);
+      line-height: 1.45;
+    }
+    header {
+      background: var(--verde);
+      color: white;
+      padding: 1.25rem 1.25rem 1rem;
+    }
+    header h1 { margin: 0 0 0.35rem; font-size: 1.55rem; }
+    header p { margin: 0; max-width: 46rem; }
+    main { max-width: 52rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
+    .panel, .grupo, details {
+      background: var(--tarjeta);
+      border: 1px solid var(--linea);
+      border-radius: 12px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    label { display: block; font-weight: 650; margin-bottom: 0.75rem; }
+    input, select, button, a.boton {
+      font: inherit;
+    }
+    input, select {
+      display: block;
+      width: 100%;
+      margin-top: 0.3rem;
+      padding: 0.55rem 0.65rem;
+      border: 1px solid var(--linea);
+      border-radius: 8px;
+      background: white;
+    }
+    #parada { min-height: 11rem; }
+    .acciones { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+    button, a.boton {
+      background: var(--verde);
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button.secundario, a.boton.secundario { background: var(--verde-oscuro); }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .meta { color: var(--suave); margin: 0.4rem 0; }
+    .aviso-caja {
+      background: var(--aviso);
+      border-radius: 8px;
+      padding: 0.7rem 0.8rem;
+      margin: 0 0 0.8rem;
+    }
+    .error { color: #8d1d1d; font-weight: 650; }
+    .fila {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.45rem 0;
+      border-top: 1px solid var(--linea);
+    }
+    .minutos { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+    .ocupacion { min-width: 7.5rem; text-align: right; }
+    .termometro {
+      display: inline-block;
+      width: 4.5rem;
+      height: 0.55rem;
+      border-radius: 99px;
+      background: #e3ece8;
+      vertical-align: middle;
+      margin-right: 0.35rem;
+      overflow: hidden;
+    }
+    .termometro > span {
+      display: block;
+      height: 100%;
+      background: #1565c0;
+    }
+    .termometro.alta > span { background: #b42318; }
+    .estimado {
+      margin-left: 0.4rem;
+      font-size: 0.75rem;
+      border: 1px solid currentColor;
+      border-radius: 99px;
+      padding: 0 0.35rem;
+    }
+    .aviso-ocupacion { color: #b42318; margin: 0.2rem 0 0; }
+    .detalle { margin: 0 0 0.6rem; color: var(--suave); }
+    .detalle summary { cursor: pointer; }
+    .detalle ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+    .ficha { margin-top: 0.8rem; }
+    .servicio { font-weight: 650; }
+    .llegando { color: var(--verde); }
+    h2 { font-size: 1.05rem; margin: 0 0 0.2rem; }
+    pre {
+      overflow: auto;
+      background: #10241e;
+      color: #e7f6ef;
+      border-radius: 8px;
+      padding: 0.8rem;
+      font-size: 0.82rem;
+    }
+    footer { color: var(--suave); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tranvía de Tenerife</h1>
+    <p>Compara estos tiempos con el panel oficial. Los datos salen de TranvíaOnline y no son una API oficial.</p>
+  </header>
+  <main>
+    <form class="panel" id="filtros">
+      <label>Buscar parada
+        <input id="buscar" type="search" placeholder="Nombre o código: Weyler, guimera, INT" autocomplete="off">
+      </label>
+      <label>Parada
+        <select id="parada" size="8"></select>
+      </label>
+      <label>Línea
+        <select id="linea">
+          <option value="">Todas</option>
+          <option value="1">Línea 1</option>
+          <option value="2">Línea 2</option>
+        </select>
+      </label>
+      <label>Número de vehículo
+        <input id="vehiculo" inputmode="numeric" placeholder="El número pintado en el tranvía, por ejemplo 102" autocomplete="off">
+      </label>
+      <div class="acciones">
+        <button type="button" id="buscar-vehiculo">Buscar vehículo</button>
+        <button type="button" id="refrescar">Actualizar ahora</button>
+        <a class="boton secundario" id="oficial" href="https://tranviaonline.metrotenerife.com/" target="_blank" rel="noopener">Ver en TranvíaOnline</a>
+      </div>
+      <p class="meta" id="reloj">Se actualiza sola cada 60 segundos.</p>
+      <div id="ficha"></div>
+    </form>
+
+    <p class="error" id="error" hidden></p>
+    <div id="lista"></div>
+
+    <details>
+      <summary>JSON que recibiría un agente con <code>proximos_tranvias</code></summary>
+      <pre id="json">Elige una parada.</pre>
+    </details>
+    <footer>
+      <p>Fuente no oficial. No redistribuyas el feed. El catálogo de paradas procede del GTFS del Cabildo de Tenerife (CC BY 4.0).</p>
+    </footer>
+  </main>
+  <script>
+    const REFRESH_MS = 60000;
+    const buscar = document.getElementById("buscar");
+    const parada = document.getElementById("parada");
+    const vehiculo = document.getElementById("vehiculo");
+    const buscarVehiculo = document.getElementById("buscar-vehiculo");
+    const ficha = document.getElementById("ficha");
+    const linea = document.getElementById("linea");
+    const refrescar = document.getElementById("refrescar");
+    const oficial = document.getElementById("oficial");
+    const lista = document.getElementById("lista");
+    const error = document.getElementById("error");
+    const json = document.getElementById("json");
+    const reloj = document.getElementById("reloj");
+    let paradas = [];
+    let timer = 0;
+    let cargando = false;
+
+    function hora(iso) {
+      if (!iso) return "sin dato";
+      return new Date(iso).toLocaleString("es-ES", {
+        timeZone: "Atlantic/Canary",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+      });
+    }
+
+    function texto(nodo, valor) {
+      nodo.textContent = valor;
+      return nodo;
+    }
+
+    function mostrarError(mensaje) {
+      error.hidden = !mensaje;
+      error.textContent = mensaje || "";
+    }
+
+    function pintarParadas() {
+      const consulta = buscar.value.trim().toLocaleLowerCase("es");
+      const actual = parada.value;
+      parada.replaceChildren();
+      const visibles = paradas.filter((item) => {
+        if (!consulta) return true;
+        const plano = (item.nombre + " " + item.codigo).toLocaleLowerCase("es");
+        return plano.includes(consulta) || quitarTildes(plano).includes(quitarTildes(consulta));
+      });
+      for (const item of visibles) {
+        const option = document.createElement("option");
+        option.value = item.codigo;
+        option.textContent = item.codigo + " — " + item.nombre + " (L" + item.lineas.join(", L") + ")";
+        parada.append(option);
+      }
+      if (visibles.some((item) => item.codigo === actual)) parada.value = actual;
+      else if (visibles.length === 1) parada.value = visibles[0].codigo;
+    }
+
+    function quitarTildes(valor) {
+      return valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function enlaceOficial(codigo) {
+      return "https://tranviaonline.metrotenerife.com/#paneles/" + codigo;
+    }
+
+    function pintarLlegadas(datos) {
+      lista.replaceChildren();
+      json.textContent = JSON.stringify(datos, null, 2);
+      if (datos.ambiguo) {
+        mostrarError(datos.mensaje || "Hay varias paradas.");
+        return;
+      }
+      mostrarError("");
+      const codigo = datos.parada && datos.parada.codigo;
+      if (codigo) {
+        oficial.href = enlaceOficial(codigo);
+        oficial.textContent = "Ver " + datos.parada.nombre + " en TranvíaOnline";
+      }
+      const caja = document.createElement("section");
+      caja.className = "panel";
+      const aviso = document.createElement("p");
+      aviso.className = "aviso-caja";
+      texto(aviso, datos.aviso || "");
+      const fuente = document.createElement("p");
+      fuente.className = "meta";
+      texto(fuente, "Última actualización de la fuente: " + hora(datos.actualizacion_fuente));
+      const consulta = document.createElement("p");
+      consulta.className = "meta";
+      texto(consulta, "Consulta hecha a las " + hora(datos.obtenido_a) + " (hora canaria).");
+      caja.append(aviso, fuente, consulta);
+      if (datos.mensaje) {
+        const vacio = document.createElement("p");
+        texto(vacio, datos.mensaje);
+        caja.append(vacio);
+      }
+      lista.append(caja);
+
+      const grupos = new Map();
+      for (const llegada of datos.llegadas || []) {
+        const clave = llegada.linea + "-" + llegada.sentido + "-" + llegada.destino_codigo;
+        if (!grupos.has(clave)) grupos.set(clave, []);
+        grupos.get(clave).push(llegada);
+      }
+      for (const grupo of grupos.values()) {
+        const primero = grupo[0];
+        const bloque = document.createElement("section");
+        bloque.className = "grupo";
+        const titulo = document.createElement("h2");
+        texto(titulo, "L" + primero.linea + " · " + primero.sentido_etiqueta);
+        const destino = document.createElement("p");
+        destino.className = "meta";
+        texto(destino, "Destino " + primero.destino);
+        bloque.append(titulo, destino);
+        for (const llegada of grupo) {
+          const fila = document.createElement("div");
+          fila.className = "fila";
+          const servicio = document.createElement("span");
+          servicio.className = "servicio";
+          const numero = llegada.vehiculo == null ? "desconocido" : String(llegada.vehiculo);
+          texto(servicio, "Vehículo " + numero + " · Servicio " + llegada.servicio);
+          if (llegada.estimado) {
+            const marca = document.createElement("span");
+            marca.className = "estimado";
+            texto(marca, "estimado");
+            servicio.append(marca);
+          }
+          const derecha = document.createElement("span");
+          derecha.className = "minutos" + (llegada.llegando ? " llegando" : "");
+          const ocupacion = document.createElement("span");
+          ocupacion.className = "ocupacion";
+          if (llegada.ocupacion_fresca && llegada.ocupacion_porcentaje != null) {
+            const barra = document.createElement("span");
+            barra.className = "termometro" + (llegada.ocupacion_muy_alta ? " alta" : "");
+            const relleno = document.createElement("span");
+            const ancho = Math.max(0, Math.min(100, llegada.ocupacion_porcentaje));
+            relleno.style.width = ancho + "%";
+            barra.append(relleno);
+            const etiqueta = llegada.ocupacion_muy_alta
+              ? llegada.ocupacion_aviso
+              : (llegada.ocupacion_texto || ("OCUPACIÓN: " + llegada.ocupacion_porcentaje + "%"));
+            ocupacion.append(barra, document.createTextNode(" " + llegada.ocupacion_porcentaje + " %"));
+            ocupacion.title = etiqueta;
+          } else {
+            texto(ocupacion, "CARGANDO OCUPACIÓN");
+          }
+          texto(derecha, llegada.llegando ? "Llegando" : llegada.minutos + " min");
+          fila.append(servicio, ocupacion, derecha);
+          bloque.append(fila);
+          if (llegada.ocupacion_muy_alta && llegada.ocupacion_aviso) {
+            const avisoOcupacion = document.createElement("p");
+            avisoOcupacion.className = "aviso-ocupacion";
+            texto(avisoOcupacion, llegada.ocupacion_aviso);
+            bloque.append(avisoOcupacion);
+          }
+          bloque.append(detalleLlegada(llegada));
+        }
+        if (grupo.length < 3) {
+          const hueco = document.createElement("p");
+          hueco.className = "meta";
+          texto(hueco, "3.er tranvía no disponible: no se puede estimar sin inventar una vuelta en cabecera.");
+          bloque.append(hueco);
+        }
+        lista.append(bloque);
+      }
+    }
+
+    async function cargar() {
+      const codigo = parada.value;
+      if (!codigo || cargando) return;
+      cargando = true;
+      refrescar.disabled = true;
+      try {
+        const params = new URLSearchParams({ parada: codigo });
+        if (linea.value) params.set("linea", linea.value);
+        const respuesta = await fetch("/api/llegadas?" + params.toString());
+        const datos = await respuesta.json();
+        if (!respuesta.ok) {
+          lista.replaceChildren();
+          json.textContent = JSON.stringify(datos, null, 2);
+          mostrarError(datos.error || "No se pudieron leer los tiempos.");
+          return;
+        }
+        pintarLlegadas(datos);
+        reloj.textContent = "Se actualiza sola cada 60 segundos. La librería guarda la respuesta 20 segundos para no insistir.";
+      } catch (err) {
+        mostrarError("No hay conexión con la página local.");
+      } finally {
+        cargando = false;
+        refrescar.disabled = false;
+      }
+    }
+
+    function programar() {
+      clearInterval(timer);
+      timer = setInterval(cargar, REFRESH_MS);
+    }
+
+    async function inicio() {
+      const respuesta = await fetch("/api/paradas");
+      const datos = await respuesta.json();
+      paradas = datos.paradas || [];
+      pintarParadas();
+      if (!parada.value && parada.options.length) parada.selectedIndex = 0;
+      await cargar();
+      programar();
+    }
+
+    function detalleLlegada(llegada) {
+      const det = document.createElement("details");
+      det.className = "detalle";
+      const sumario = document.createElement("summary");
+      texto(sumario, "Detalle");
+      const puntos = document.createElement("ul");
+      const filas = [];
+      if (llegada.orden_parada != null) {
+        filas.push("Orden de esta parada en la línea: " + llegada.orden_parada);
+      }
+      const posicion = llegada.posicion;
+      if (posicion) {
+        filas.push(
+          "Próxima parada del tranvía: " + posicion.proxima_parada
+          + " (" + posicion.minutos_proxima_parada + " min)"
+        );
+        filas.push("Posición: " + posicion.lat + ", " + posicion.lon);
+        if (posicion.orden != null) filas.push("Orden del vehículo en la línea: " + posicion.orden);
+      } else {
+        filas.push("Sin posición en vivo para este servicio.");
+      }
+      filas.push(llegada.estimado
+        ? "Esta llegada es estimada: el panel no la anuncia."
+        : "Esta llegada la anuncia el panel.");
+      for (const fila of filas) {
+        const item = document.createElement("li");
+        texto(item, fila);
+        puntos.append(item);
+      }
+      det.append(sumario, puntos);
+      return det;
+    }
+
+    function pintarVehiculo(datos) {
+      ficha.replaceChildren();
+      const caja = document.createElement("section");
+      caja.className = "ficha";
+      const titulo = document.createElement("h2");
+      texto(titulo, "Vehículo " + datos.numero);
+      const mensaje = document.createElement("p");
+      texto(mensaje, datos.mensaje || "");
+      caja.append(titulo, mensaje);
+      if (datos.estado === "en_servicio") {
+        const lista = document.createElement("ul");
+        const filas = [
+          "Servicio " + datos.servicio,
+          "Línea " + datos.linea + " · " + (datos.sentido_etiqueta || ""),
+          "Destino " + (datos.destino || "desconocido"),
+          "Próxima parada: " + datos.proxima_parada + " (" + datos.minutos_proxima_parada + " min)",
+          "Posición: " + datos.lat + ", " + datos.lon
+        ];
+        if (datos.orden != null) filas.push("Orden en la línea: " + datos.orden);
+        filas.push(datos.ocupacion_fresca
+          ? "Ocupación reciente: " + datos.ocupacion_porcentaje + " %"
+          : "Ocupación desconocida: la fila no es reciente.");
+        for (const fila of filas) {
+          const item = document.createElement("li");
+          texto(item, fila);
+          lista.append(item);
+        }
+        caja.append(lista);
+      }
+      ficha.append(caja);
+    }
+
+    async function consultarVehiculo() {
+      const numero = vehiculo.value.trim();
+      if (!/^[1-9][0-9]*$/.test(numero)) {
+        mostrarError("Escribe el número pintado en el tranvía.");
+        return;
+      }
+      mostrarError("");
+      buscarVehiculo.disabled = true;
+      try {
+        const respuesta = await fetch("/api/vehiculo?numero=" + encodeURIComponent(numero));
+        const datos = await respuesta.json();
+        if (!respuesta.ok) {
+          ficha.replaceChildren();
+          mostrarError(datos.error || "No se pudo consultar el vehículo.");
+          return;
+        }
+        pintarVehiculo(datos);
+      } catch (err) {
+        mostrarError("No hay conexión con la página local.");
+      } finally {
+        buscarVehiculo.disabled = false;
+      }
+    }
+
+    buscar.addEventListener("input", pintarParadas);
+    buscarVehiculo.addEventListener("click", consultarVehiculo);
+    parada.addEventListener("change", () => { cargar(); programar(); });
+    linea.addEventListener("change", () => { cargar(); programar(); });
+    refrescar.addEventListener("click", () => { cargar(); programar(); });
+    inicio();
+  </script>
+</body>
+</html>
