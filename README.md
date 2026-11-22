@@ -1,306 +1,148 @@
-# Tranvía de Tenerife
+<p align="center">
+  <img src="assets/banner.svg" alt="Tiempos del tranvía, un proyecto personal" width="100%">
+</p>
 
-Tiempos en vivo del tranvía de Tenerife (Metrotenerife) para agentes de IA, con un servidor [MCP](https://modelcontextprotocol.io), y para Home Assistant, con una integración instalable con HACS.
+<p align="center">
+  <a href="https://github.com/Yannedugo/metrotenerife-mcp/actions/workflows/ci.yml"><img src="https://github.com/Yannedugo/metrotenerife-mcp/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-blue" alt="Licencia MIT, solo el código"></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.11%2B-3776AB" alt="Python 3.11 o superior"></a>
+  <a href="https://hacs.xyz/"><img src="https://img.shields.io/badge/HACS-integraci%C3%B3n%20custom-41BDF5" alt="Integración custom para HACS"></a>
+</p>
 
-El mismo código que habla con TranvíaOnline sirve a los dos. Está pensado para poder añadir otro operador —TITSA, las guaguas— sin reescribir el servidor ni los modelos.
+Consulta los próximos tranvías de Tenerife desde un agente de IA (servidor [MCP](https://modelcontextprotocol.io)) o desde Home Assistant. También hay una página local, `metrotenerife-demo`, para mirar los tiempos en el navegador.
 
-[![CI](https://github.com/Yannedugo/metrotenerife-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Yannedugo/metrotenerife-mcp/actions/workflows/ci.yml)
-[![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-green.svg)](LICENSE)
+El mismo código lee TranvíaOnline para los tres. Está preparado para añadir más adelante otro operador —las guaguas de TITSA— sin reescribir los modelos.
 
-> **No es un servicio oficial.** Este proyecto no está afiliado, patrocinado ni mantenido por Metropolitano de Tenerife ni por el Cabildo Insular de Tenerife. TranvíaOnline no es una API pública: no tiene contrato, puede cambiar sin aviso y no hay que tratarla como un feed para redistribuir. El sondeo es deliberadamente lento.
+> **Proyecto personal, no oficial y sin ánimo de lucro.** No está afiliado, patrocinado ni avalado por Metropolitano de Tenerife, S.A. ni por el Cabildo Insular de Tenerife. Las marcas son de sus titulares. Los tiempos en vivo salen de la web pública TranvíaOnline, sin garantía, y no se almacenan ni se redistribuyen. El catálogo de paradas deriva de un GTFS con licencia CC BY 4.0. No lo uses para una decisión crítica. El detalle y la atribución están en [NOTICE.md](NOTICE.md). Si un titular pide retirarlo, se retira o se adapta: el contacto son los [issues](https://github.com/Yannedugo/metrotenerife-mcp/issues).
 
-## Atribución de los datos
+## Qué se ve
 
-El catálogo de paradas, coordenadas, líneas y orden de marcha es un derivado del GTFS de **Metropolitano de Tenerife**, publicado por el **Cabildo Insular de Tenerife** en [datos.tenerife.es](https://datos.tenerife.es/ckan/dataset/4b83e018-37d9-40a6-b6d1-1df2b91c8117) y en [metrotenerife.com/transit/google_transit.zip](https://metrotenerife.com/transit/google_transit.zip), bajo licencia [Creative Commons Attribution 4.0 (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+La demo local agrupa los dos tranvías que anuncia el panel y, cuando se puede calcular con prudencia, un tercero marcado como **estimado**. La ocupación usa la misma tabla que la web: el número crudo no es un porcentaje.
 
-Ese feed tiene vigencia **2024-09-08 a 2025-07-15** y está caducado. Aquí solo se usa como catálogo: no se copian frecuencias ni horarios. Algunas tildes que el CSV perdía («Señor», «España», «Jerónimo») están restituidas. La atribución viaja dentro de `catalog.json`, que es lo que se instala.
+<p align="center">
+  <img src="assets/demo-llegadas.png" alt="Página local con las llegadas de Intercambiador, ocupación y un tercer tranvía estimado" width="820">
+</p>
 
-Los tiempos en vivo se consultan en el momento, desde tu máquina, a `tranviaonline.metrotenerife.com`. No se republican.
-
-## Qué hay en el repositorio
-
-```mermaid
-flowchart LR
-  subgraph fuentes [Fuentes]
-    GTFS["GTFS CC BY<br/>catálogo estático"]
-    Online["TranvíaOnline<br/>JSON no oficial"]
-  end
-  Lib["Paquete metrotenerife"]
-  MCP["Servidor MCP"]
-  HA["Integración Home Assistant"]
-  GTFS --> Lib
-  Online --> Lib
-  Lib --> MCP
-  Lib --> HA
-```
-
-| Pieza | Para qué |
-| --- | --- |
-| `src/metrotenerife` | Librería asyncio. Catálogo, cliente HTTP, modelos y registro de operadores. |
-| `src/metrotenerife_mcp` | Servidor MCP. stdio para usarlo en local y HTTP streamable para alojarlo. |
-| `src/metrotenerife_demo` | Página local para contrastar los tiempos con TranvíaOnline. |
-| `custom_components/metrotenerife` | Integración de Home Assistant. La librería va vendorizada en `vendor/`. |
+La captura es la página local con una respuesta de muestra: dos tranvías anunciados, uno de ellos con ocupación muy alta, y un tercero estimado. En tu máquina los minutos y la ocupación son los del momento.
 
 ## Probarlo en local
 
-La página usa la misma librería que el servidor MCP. Sirve para mirar los minutos al lado del panel oficial de TranvíaOnline.
+Hace falta Python 3.11 o superior. No hace falta Home Assistant ni un servidor MCP.
 
-Hace falta Python 3.11 o más nuevo. No hace falta saber qué es un entorno virtual: el comando crea una carpeta `.venv` con su propia copia de Python, sin tocar el resto del ordenador. Abre una terminal en la carpeta del proyecto (en Windows, la carpeta donde está este README).
+**Windows** (PowerShell, en la carpeta del repositorio):
 
-### Windows
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python -m pip install -e .
+.\.venv\Scripts\metrotenerife-demo
+```
 
-1. Comprueba Python. En PowerShell o en el Símbolo del sistema: `py --version`. Si no reconoce `py`, prueba `python --version`. Tiene que decir 3.11 o más.
-2. Crea la carpeta del entorno: `py -m venv .venv` (o `python -m venv .venv`).
-3. Instala el proyecto: `.venv\Scripts\python -m pip install -e .`
-4. Arranca la página: `.venv\Scripts\metrotenerife-demo`
-5. Abre el navegador en [http://127.0.0.1:8000](http://127.0.0.1:8000).
-
-### macOS
-
-1. Abre Terminal, entra en la carpeta del proyecto y comprueba Python: `python3 --version`. Tiene que decir 3.11 o más.
-2. Crea la carpeta del entorno: `python3 -m venv .venv`
-3. Instala el proyecto: `.venv/bin/python -m pip install -e .`
-4. Arranca la página: `.venv/bin/metrotenerife-demo`
-5. Abre el navegador en [http://127.0.0.1:8000](http://127.0.0.1:8000).
-
-### Linux
-
-Los mismos pasos que en macOS:
+**macOS y Linux:**
 
 ```bash
-python3 --version
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .
 .venv/bin/metrotenerife-demo
 ```
 
-Luego abre [http://127.0.0.1:8000](http://127.0.0.1:8000).
+Abre [http://127.0.0.1:8000](http://127.0.0.1:8000). Si el puerto está ocupado, `--port 8001`. Si no conecta, `--debug` escribe en la terminal el tipo de error y el mensaje.
 
-Elige una parada, o escribe parte del nombre. Cada tranvía muestra los minutos y, si el dato es reciente, el porcentaje de ocupación. La lista se refresca sola cada 60 segundos y también con **Actualizar ahora**. El enlace **Ver en TranvíaOnline** abre el panel oficial de esa parada para comparar. Al final de la página está el JSON que devolvería la herramienta `proximos_tranvias` a un agente. Para cerrar el programa, vuelve a la terminal y pulsa Ctrl+C. Si no conecta, vuelve a lanzarlo con `--debug` (en Windows, `.venv\Scripts\metrotenerife-demo --debug`) y mira el mensaje: incluye la causa, por ejemplo un fallo de certificado.
+En macOS, un Python instalado desde python.org a veces no trae los certificados del sistema. Este programa usa el paquete `certifi` y no desactiva la verificación. Si aun así falla, ejecuta `Install Certificates.command` dentro de la carpeta de tu Python.
 
-Si el puerto 8000 está ocupado: `metrotenerife-demo --port 8001` y abre `http://127.0.0.1:8001`. En Windows el comando es `.venv\Scripts\metrotenerife-demo --port 8001`.
-
-## Librería
-
-El cliente usa `aiohttp`, con tipos, tiempos de espera, caché de 20 segundos y como mucho una petición a la vez, separadas al menos un segundo. Ante un 429 o un 5xx reintenta dos veces, con espera creciente y respetando `Retry-After` (como máximo 30 segundos). El `User-Agent` identifica el proyecto y dice que el uso es personal.
-
-La ocupación (`/api/cargaVehiculo`, campo `CARGA`) se une por el número de servicio. En el JavaScript oficial, `CARGA` no es un porcentaje: `getCargaNormalizada` lo convierte a uno (por ejemplo 28 se muestra como 33 %). Si el valor crudo es 80 o más, el texto es el aviso de ocupación muy alta y el indicador pasa a rojo; por debajo, azul y «OCUPACIÓN: N %». Sin fila reciente se muestra como desconocida, igual que el «CARGANDO OCUPACIÓN» de la web. La API anuncia dos llegadas por parada, línea y sentido. Un tercero, si aparece, está marcado `estimado` y sale de la posición del siguiente tranvía más los minutos entre paradas del GTFS caducado. Si haría falta dar la vuelta en la cabecera, no se muestra.
-
-Las peticiones verifican el certificado TLS con el almacén de `certifi`. Así funciona también el Python de python.org en macOS, que no trae raíces hasta ejecutar Install Certificates.command. La verificación no se desactiva. Si aun así falla, el mensaje incluye el tipo de excepción y un texto breve; `metrotenerife-demo --debug` escribe el detalle en la terminal.
-
-La búsqueda de paradas no distingue tildes ni mayúsculas: `guimera`, `GUIMERÁ` y `03` encuentran Teatro Guimerá.
-
-```python
-from metrotenerife import TranviaOnlineClient, TranviaOperator
-
-async with TranviaOnlineClient() as client:
-    operator = TranviaOperator(client)
-    parada, llegadas, cuando = await operator.arrivals("Weyler", line=1)
-```
-
-### Por qué la librería va vendorizada y no en PyPI
-
-Home Assistant, al instalar una integración de HACS, solo copia `custom_components/metrotenerife`. No instala el resto del repositorio. Un `requirements` del manifest solo funciona si el paquete está publicado.
-
-El repositorio es privado todavía, así que publicarlo en PyPI ahora dejaría la integración a medias. La copia canónica está en `src/metrotenerife`. `scripts/sync_vendor.py` la vuelca en `custom_components/metrotenerife/vendor/metrotenerife`, y la integración la importa desde ahí. La integración y el servidor MCP ejecutan el mismo código. El workflow falla si las dos copias se separan.
-
-Cuando el repo sea público se puede publicar `metrotenerife` en PyPI, poner esa dependencia en el manifest y borrar `vendor/`. Hasta entonces, la copia vendorizada es la que hace que HACS funcione sin un paso extra.
-
-### Añadir otro operador
-
-Los modelos (`Stop`, `Arrival`, `Vehicle`, `Line`) no son del tranvía. Un operador nuevo implementa el protocolo `TransitOperator` —buscar paradas, líneas, llegadas y vehículos— y se registra:
-
-```python
-registry = OperatorRegistry()
-registry.register(TranviaOperator(client))
-registry.register(TitsaOperator(...))  # todavía no existe
-```
-
-Las herramientas MCP ya aceptan `operador`. Hoy el único valor es `tranvia`; cualquier otro nombre devuelve la lista de operadores registrados. TITSA no está implementada: no hay un cliente a medias que parezca que funciona.
-
-## Servidor MCP
-
-El SDK oficial de Python, versión 2, llama `MCPServer` a lo que en la 1.x se llamaba FastMCP. Este servidor usa esa clase. No hace falta elegir la versión vieja.
-
-Herramientas:
-
-| Herramienta | Qué devuelve |
-| --- | --- |
-| `buscar_parada` | Paradas del catálogo que encajan con el texto. |
-| `proximos_tranvias` | Próximos tranvías de una parada. Filtros opcionales: `linea` (1 o 2), `sentido` (1 o 2) y `destino`. |
-| `estado_tranvias` | Posición de las unidades y ocupación, si el dato es reciente. |
-| `info_lineas` | Líneas, sentidos y paradas en orden. Es catálogo, no un horario. |
-
-Las respuestas de tiempos en vivo incluyen `obtenido_a` (cuándo consultamos), `actualizacion_fuente` (la marca de tiempo del panel, si la hay) y un aviso de que son datos en vivo de una fuente no oficial. Si el nombre encaja con varias paradas, la respuesta trae los candidatos en vez de adivinar.
-
-Sentidos habituales, que en las terminales a veces no cuadran con el panel:
-
-| Línea | Sentido 1 | Sentido 2 |
-| --- | --- | --- |
-| 1 | Hacia La Trinidad | Hacia Intercambiador |
-| 2 | Hacia La Cuesta | Hacia Tíncer |
-
-### Arrancar el servidor para un agente
-
-Con el entorno del apartado [Probarlo en local](#probarlo-en-local) ya creado, instala también el extra del MCP y arranca el servidor.
-
-macOS y Linux:
+## Un agente, con MCP
 
 ```bash
-.venv/bin/python -m pip install -e ".[mcp]"
-.venv/bin/metrotenerife-mcp
+pip install -e ".[mcp]"
 ```
 
-Windows:
-
-```bat
-.venv\Scripts\python -m pip install -e ".[mcp]"
-.venv\Scripts\metrotenerife-mcp
-```
-
-Eso habla por la entrada y salida estándar y no imprime nada: es lo que espera un cliente MCP.
-
-Claude Desktop, en `claude_desktop_config.json`:
+stdio, para Claude Desktop o Cursor. Claude: Ajustes, Desarrollador, Editar configuración. Cursor: Ajustes, MCP.
 
 ```json
 {
   "mcpServers": {
     "metrotenerife": {
-      "command": "/ruta/absoluta/al/.venv/bin/metrotenerife-mcp"
+      "command": "/ruta/absoluta/al/entorno/bin/metrotenerife-mcp",
+      "args": []
     }
   }
 }
 ```
 
-Cursor, en `.cursor/mcp.json` del proyecto o en la configuración global de MCP:
+En Windows la ruta acaba en `.venv\\Scripts\\metrotenerife-mcp.exe`.
 
-```json
-{
-  "mcpServers": {
-    "metrotenerife": {
-      "command": "/ruta/absoluta/al/.venv/bin/metrotenerife-mcp"
-    }
-  }
-}
-```
-
-Usa la ruta absoluta del ejecutable del entorno virtual. Si el comando no está en el `PATH` del cliente, un simple `metrotenerife-mcp` no lo encuentra.
-
-### HTTP streamable, para alojarlo después
+HTTP streamable, en `http://127.0.0.1:8080/mcp`:
 
 ```bash
 metrotenerife-mcp --transport http --host 127.0.0.1 --port 8080
 ```
 
-El punto MCP queda en `http://127.0.0.1:8080/mcp`. Un cliente que hable HTTP streamable lo configura con esa URL. `GET /health` responde `{"status": "ok"}` y no llama a TranvíaOnline. El modo HTTP es sin estado (`stateless`), para poder poner más de una instancia delante de un balanceador.
+`GET /health` responde `{"status": "ok"}`.
 
-En la configuración del cliente:
+Preguntas que el agente puede resolver con las herramientas:
 
-```json
-{
-  "mcpServers": {
-    "metrotenerife": {
-      "url": "http://127.0.0.1:8080/mcp"
-    }
-  }
-}
-```
+- «¿Cuándo llega el próximo tranvía a La Trinidad?»
+- «En Intercambiador, ¿qué hay de la línea 1 hacia La Trinidad y de la línea 2 hacia La Cuesta?»
+- «¿Va muy lleno el próximo tranvía en Weyler?»
+- «¿Qué paradas coinciden con “cruz”?»
 
-No lo expongas a internet tal cual: no tiene autenticación. Delante haría falta un proxy con acceso restringido.
+| Herramienta | Qué devuelve |
+| --- | --- |
+| `buscar_parada` | Paradas del catálogo cuyo nombre o código coincide. |
+| `proximos_tranvias` | Por cada sentido, hasta 3 llegadas. Las dos primeras salen del panel; la tercera, si aparece, va marcada `estimado: true`. Incluye ocupación cruda, porcentaje normalizado y aviso de ocupación muy alta. `por_sentido` admite de 1 a 6. |
+| `estado_tranvias` | Posición de los vehículos y su ocupación, si el dato es reciente. |
+| `info_lineas` | Líneas, sentidos y paradas en orden de marcha. |
 
 ## Home Assistant
 
-[![Añadir el repositorio a HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Yannedugo&repository=metrotenerife-mcp&category=integration)
+La integración es custom. El botón de abajo abre el asistente de HACS **cuando el repositorio sea público**. Mientras siga privado, HACS no puede añadirlo: copia `custom_components/metrotenerife` (incluida la carpeta `vendor`) en `config/custom_components/` y reinicia.
 
-El botón abre HACS con este repositorio como integración personalizada. Mientras el repositorio siga siendo privado, HACS no puede clonarlo sin un token de GitHub: copia la carpeta a mano.
+[![Abrir en Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Yannedugo&repository=metrotenerife-mcp&category=integration)
 
-[![Añadir Tranvía de Tenerife](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=metrotenerife)
+Después: Ajustes, Dispositivos y servicios, Añadir integración, «Tranvía de Tenerife».
 
-Ese segundo botón abre el flujo de configuración cuando la integración ya está instalada.
+[![Añadir la integración](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=metrotenerife)
 
-### Instalación manual y en un Home Assistant de desarrollo
+Una sola entrada de configuración, con el intervalo de sondeo (mínimo 60 segundos, por defecto 90). Cada parada es una subentrada: se busca por nombre y se puede limitar a una línea y un sentido.
 
-1. Copia `custom_components/metrotenerife` —incluida `vendor/`— a `<config>/custom_components/metrotenerife`.
-2. Reinicia Home Assistant.
-3. Ajustes → Dispositivos y servicios → Añadir integración → **Tranvía de Tenerife**.
-4. Elige el intervalo (por defecto 90 segundos, mínimo 60) y pulsa **Añadir parada**.
-
-En un Home Assistant de desarrollo vale un enlace simbólico a `custom_components/metrotenerife` de este repositorio. Si cambias la librería, vuelve a ejecutar `python scripts/sync_vendor.py` antes de reiniciar: Home Assistant no lee `src/`.
-
-El flujo es una entrada única y, dentro, una subentrada por parada. Puedes buscar por código (`INT`, `WEY`) o por nombre (`cardonal`, `guimera`). La línea y el sentido son opcionales. La misma parada puede repetirse si el filtro cambia, por ejemplo El Cardonal solo en la línea 1 y otra vez solo en la línea 2.
-
-Hay una sola petición por ciclo, a todos los paneles a la vez, más un margen aleatorio de hasta 15 segundos para no coincidir siempre con otros clientes. El botón **Actualizar** de cada parada fuerza una lectura, con una espera mínima de 60 segundos entre medias.
-
-### Entidades
-
-Los nombres salen traducidos. En un Home Assistant en español verás «Próximo tranvía» y «Minutos»; en inglés, «Next tram» y «Minutes».
-
-| Entidad | Qué es |
+| Sensor | Valor |
 | --- | --- |
-| `sensor.…_proximo_tranvia` | Hora estimada de llegada (`timestamp`). La interfaz enseña la cuenta atrás. |
-| `sensor.…_minutos` | Minutos que anuncia el panel, para automatizaciones numéricas. `0` es «llegando». |
-| `sensor.…_linea_1` | Solo si filtraste líneas: el próximo tranvía de esa línea. |
-| `button.…_actualizar` | Lectura manual, con la espera de 60 segundos. |
+| Próximo tranvía | Hora del primero. Atributos: minutos, destino, línea, ocupación y si el dato es del panel. |
+| Segundo tranvía | La otra llegada que anuncia el panel para ese mismo sentido. |
+| Tercer tranvía | Solo si hay una estimación fiable. Si no, queda en desconocido. El atributo `origin` vale `estimado`. |
+| Minutos | Minutos hasta el primero. |
+| Por línea | Si no filtraste la línea, un sensor por cada línea que pasa por la parada. |
 
-Atributos del sensor de hora, con claves estables en inglés:
+La ocupación desconocida no se inventa: hace falta un dato reciente de `cargaVehiculo`. A partir de un valor crudo de 80 la web muestra ocupación muy alta; aquí se replica esa tabla y ese aviso.
 
-`stop_code`, `stop_name`, `line`, `direction`, `direction_label`, `destination`, `minutes`, `service`, `arrivals`, `source_updated_at`, `fetched_at`.
+## Preguntas frecuentes
 
-`arrivals` es la lista acotada de los próximos pasos por la parada, ya filtrados.
+**¿Es oficial?** No. Es un proyecto personal. La fuente en vivo es la web pública TranvíaOnline, que puede cambiar o dejar de responder sin aviso.
 
-Ejemplo de tarjeta Markdown:
+**¿Por qué a veces no hay ocupación?** Porque no llegó una fila reciente para ese servicio, o porque la fila era vieja. En ese caso se muestra «CARGANDO OCUPACIÓN», igual que la web cuando aún no tiene el dato.
 
-```yaml
-type: markdown
-title: Intercambiador
-content: |
-  {% set s = 'sensor.intercambiador_int_proximo_tranvia' %}
-  {% set llegadas = state_attr(s, 'arrivals') or [] %}
-  {% if llegadas | length == 0 %}
-  Sin tranvías anunciados.
-  {% else %}
-  | Línea | Destino | Minutos |
-  | --- | --- | --- |
-  {% for item in llegadas %}
-  | L{{ item.line }} | {{ item.destination }} | {{ item.minutes }} |
-  {% endfor %}
-  {% endif %}
-```
+**¿Por qué el tercero dice «estimado»?** El panel devuelve dos llegadas por parada, línea y sentido. La tercera se calcula con la posición de un vehículo que aún no ha sido anunciado y con los minutos entre paradas del catálogo. Si el vehículo ya pasó, si tendría que dar la vuelta en la cabecera o si el cálculo no es posterior a los dos anunciados, no se muestra.
 
-El `entity_id` real depende del nombre del dispositivo y del idioma en el momento de crearlo. Ajústalo al que aparezca en Herramientas de desarrollo.
+**¿Puedo fiarme para salir de casa con el tiempo justo?** No. Contrasta con el panel oficial si la hora importa.
 
-## Desarrollo
+**En el Mac dice que no se pudo verificar el certificado.** El mensaje incluye el tipo de excepción. `--debug` deja el trazado en la terminal. La comprobación TLS no se desactiva.
 
-Python 3.11 o superior. Los tests no llaman a TranvíaOnline: usan las respuestas guardadas en `tests/fixtures/`.
+## Roadmap
+
+El registro de operadores ya separa «quién opera» de «cómo se lee». El siguiente operador previsto es TITSA, las guaguas, con su propia fuente y el mismo contrato hacia el MCP y Home Assistant. Hasta entonces solo está el tranvía.
+
+## Contribuir
+
+Las incidencias y las propuestas van a los [issues](https://github.com/Yannedugo/metrotenerife-mcp/issues). Antes de un cambio:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev,mcp]"
-ruff check src tests custom_components scripts
-ruff format src tests custom_components scripts
-python scripts/sync_vendor.py
-pytest
+python3 -m ruff check src tests custom_components scripts
+python3 -m ruff format --check src tests custom_components scripts
+python3 scripts/sync_vendor.py --check
+python3 -m pytest -q
 ```
 
-Para regenerar el catálogo cuando el Cabildo publique un GTFS nuevo:
-
-```bash
-python scripts/build_catalog.py ruta/google_transit.zip
-python scripts/sync_vendor.py
-```
-
-El workflow de GitHub Actions ejecuta ruff, la comprobación de la copia vendorizada, pytest y hassfest. La action oficial de HACS solo valida repositorios públicos; mientras este lo sea privado, el job `hacs` ejecuta `scripts/validate_hacs.py`. Al publicarlo, el mismo job añade `hacs/action`.
-
-`tests/fixtures/info_panel_all.json` es la respuesta real de `GET /api/infoStops/infoPanel` del 22 de noviembre de 2026, sobre las 14:42 (hora canaria): una lista plana de 100 llegadas, con el mismo esquema que el panel de una parada. Cubre las 25 paradas y los dos sentidos de cada línea. El panel de una sola parada, las posiciones y la ocupación siguen el esquema verificado ese mismo día; algunas filas extra sirven para probar el descarte de ocupación vieja.
+Los tests no llaman a TranvíaOnline: usan respuestas grabadas. Si tocas `src/metrotenerife`, ejecuta `python3 scripts/sync_vendor.py` para copiar la librería dentro de la integración. No subas un volcado histórico del feed en vivo.
 
 ## Licencia
 
-Código bajo [MIT](LICENSE). El catálogo derivado sigue siendo CC BY 4.0 del Cabildo Insular de Tenerife / Metropolitano de Tenerife, y hay que mantener la atribución al redistribuirlo.
-
-## Pendiente
-
-- Publicar el paquete `metrotenerife` en PyPI y dejar de vendorizarlo cuando el repositorio sea público.
-- Operador de TITSA, enchufado en el registro, cuando se haga el mismo trabajo de fuentes que con el tranvía.
-- Sustituir el catálogo cuando haya un GTFS vigente. El actual no sirve para horarios.
-- Tarjeta Lovelace propia, al estilo de una marquesina. Con los sensores de hora y el atributo `arrivals` no hace falta para usarlo.
+El código está bajo [MIT](LICENSE), copyright 2026 Yann Favier (Yannedugo). Esa licencia cubre el código, no los datos de terceros. La atribución del GTFS y el aviso sobre el uso de TranvíaOnline están en [NOTICE.md](NOTICE.md).

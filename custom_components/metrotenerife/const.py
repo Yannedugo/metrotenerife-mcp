@@ -29,5 +29,8 @@ MIN_REQUEST_INTERVAL_SECONDS = 1.0
 MAX_ARRIVALS_ATTRIBUTE = 8
 
 USER_AGENT = (
-    f"HomeAssistant-Metrotenerife/{VERSION} (+https://github.com/Yannedugo/metrotenerife-mcp)"
+    f"HomeAssistant-Metrotenerife/{VERSION} "
+    "(+https://github.com/Yannedugo/metrotenerife-mcp; "
+    "contacto: https://github.com/Yannedugo/metrotenerife-mcp/issues; "
+    "uso personal, no oficial, sin ánimo de lucro)"
 )

@@ -37,7 +37,8 @@ logger = logging.getLogger(__name__)
 
 USER_AGENT = (
     "metrotenerife/0.1.0 (+https://github.com/Yannedugo/metrotenerife-mcp; "
-    "uso personal, fuente no oficial)"
+    "contacto: https://github.com/Yannedugo/metrotenerife-mcp/issues; "
+    "uso personal, no oficial, sin ánimo de lucro)"
 )
 DEFAULT_BASE_URL = "https://tranviaonline.metrotenerife.com"
 CANARY = ZoneInfo("Atlantic/Canary")

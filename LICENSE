@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Yann
+Copyright (c) 2026 Yann Favier (Yannedugo)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Alcance. Esta licencia MIT cubre únicamente el código fuente de este
+repositorio. No cubre los datos de terceros, las marcas ni la información en
+vivo leída de TranvíaOnline. La atribución del catálogo derivado del GTFS
+(CC BY 4.0) y el aviso sobre el proyecto están en NOTICE.md.
