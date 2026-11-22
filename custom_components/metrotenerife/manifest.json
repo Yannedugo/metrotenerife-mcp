@@ -8,7 +8,7 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Yannedugo/metrotenerife-mcp/issues",
-  "requirements": [],
+  "requirements": ["certifi>=2024.8.30"],
   "single_config_entry": true,
   "version": "0.1.0"
 }

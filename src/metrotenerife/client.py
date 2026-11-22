@@ -12,13 +12,16 @@ import json
 import logging
 import random
 import re
+import ssl
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import aiohttp
+import certifi
 
 from metrotenerife.errors import (
     HttpStatusError,
@@ -41,6 +44,20 @@ _STOP_CODE = re.compile(r"^[A-Z0-9]{2,4}$")
 _LOCAL_TIME = "%d/%m/%Y %H:%M:%S"
 
 Sleeper = Callable[[float], Awaitable[None]]
+Clock = Callable[[], datetime]
+
+
+def default_ssl_context() -> ssl.SSLContext:
+    """Contexto que verifica el certificado con el almacén de certifi.
+
+    El Python de python.org en macOS no trae raíces hasta que se ejecuta
+    Install Certificates.command. certifi las incluye y la verificación sigue
+    activa: no se usa CERT_NONE.
+    """
+    context = ssl.create_default_context(cafile=certifi.where())
+    context.check_hostname = True
+    context.verify_mode = ssl.CERT_REQUIRED
+    return context
 
 
 class _TTLCache:
@@ -77,6 +94,8 @@ class TranviaOnlineClient:
         user_agent: str = USER_AGENT,
         occupancy_max_age: float = 180.0,
         sleeper: Sleeper | None = None,
+        clock: Clock | None = None,
+        ssl_context: ssl.SSLContext | None = None,
     ) -> None:
         self._session = session
         self._owns_session = session is None
@@ -87,6 +106,8 @@ class TranviaOnlineClient:
         self._user_agent = user_agent
         self._occupancy_max_age = timedelta(seconds=occupancy_max_age)
         self._sleeper = sleeper or asyncio.sleep
+        self._clock = clock or (lambda: datetime.now(UTC))
+        self._ssl = ssl_context or default_ssl_context()
         self._cache = _TTLCache(cache_ttl)
         self._lock = asyncio.Lock()
         self._last_request_at: float | None = None
@@ -106,13 +127,14 @@ class TranviaOnlineClient:
     def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None:
             self._session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=self._timeout)
+                timeout=aiohttp.ClientTimeout(total=self._timeout),
+                connector=aiohttp.TCPConnector(ssl=self._ssl),
             )
             self._owns_session = True
         return self._session
 
     async def panel(self, stop_code: str) -> list[Arrival]:
-        """Próximos tranvías anunciados en una parada."""
+        """Próximos tranvías anunciados en una parada, con ocupación si está fresca."""
         code = normalize_stop_code(stop_code)
         try:
             payload = await self._get_json(f"/api/infoStops/infoPanel/{code}")
@@ -120,7 +142,8 @@ class TranviaOnlineClient:
             if err.status == 404:
                 raise StopNotFoundError(code) from err
             raise
-        return _sort_arrivals(parse_arrivals(payload))
+        arrivals = parse_arrivals(payload, now=self._clock())
+        return _sort_arrivals(await self._with_occupancy(arrivals))
 
     async def panels(self) -> dict[str, list[Arrival]]:
         """Próximos tranvías de todas las paradas, agrupados por código.
@@ -130,8 +153,9 @@ class TranviaOnlineClient:
         tengan esa forma, por si el endpoint cambia el envoltorio.
         """
         payload = await self._get_json("/api/infoStops/infoPanel")
+        arrivals = await self._with_occupancy(parse_arrivals(payload, now=self._clock()))
         grouped: dict[str, list[Arrival]] = {}
-        for arrival in parse_arrivals(payload):
+        for arrival in arrivals:
             grouped.setdefault(arrival.stop_code, []).append(arrival)
         return {code: _sort_arrivals(items) for code, items in grouped.items()}
 
@@ -140,23 +164,28 @@ class TranviaOnlineClient:
 
         Si la ocupación falla, se devuelven igual las posiciones.
         """
-        moment = now or datetime.now(UTC)
+        moment = now or self._clock()
         locations = await self._get_json("/api/infoStops/vehicleLocation")
         vehicles = parse_vehicles(locations)
-        occupancy_available = True
-        fresh: dict[str, Occupancy] = {}
-        stale: set[str] = set()
-        try:
-            payload = await self._get_json("/api/cargaVehiculo")
-        except (HttpStatusError, RequestTimeoutError, ParseError):
-            logger.warning("No se pudo leer la ocupación; se devuelven solo las posiciones")
-            occupancy_available = False
-        else:
-            fresh, stale = parse_occupancy(payload, now=moment, max_age=self._occupancy_max_age)
+        fresh, stale, occupancy_available = await self._occupancy_index(moment)
         merged = tuple(merge_occupancy(vehicle, fresh, stale) for vehicle in vehicles)
         return VehicleSnapshot(
             vehicles=merged, fetched_at=moment, occupancy_available=occupancy_available
         )
+
+    async def _with_occupancy(self, arrivals: list[Arrival]) -> list[Arrival]:
+        fresh, stale, _available = await self._occupancy_index(self._clock())
+        return [attach_occupancy(arrival, fresh, stale) for arrival in arrivals]
+
+    async def _occupancy_index(self, now: datetime) -> tuple[dict[str, Occupancy], set[str], bool]:
+        """Ocupación fresca, servicios con dato viejo y si el endpoint respondió."""
+        try:
+            payload = await self._get_json("/api/cargaVehiculo")
+        except (HttpStatusError, RequestTimeoutError, TransportError, ParseError):
+            logger.warning("No se pudo leer la ocupación; se deja como desconocida")
+            return {}, set(), False
+        fresh, stale = parse_occupancy(payload, now=now, max_age=self._occupancy_max_age)
+        return fresh, stale, True
 
     async def _get_json(self, path: str) -> Any:
         cached = self._cache.get(path)
@@ -200,7 +229,9 @@ class TranviaOnlineClient:
         headers = {"User-Agent": self._user_agent, "Accept": "application/json"}
         timeout = aiohttp.ClientTimeout(total=self._timeout)
         try:
-            async with session.get(url, headers=headers, timeout=timeout) as response:
+            async with session.get(
+                url, headers=headers, timeout=timeout, ssl=self._ssl
+            ) as response:
                 if response.status >= 400:
                     raise HttpStatusError(
                         response.status, path, retry_after=_retry_after(response.headers)
@@ -210,9 +241,11 @@ class TranviaOnlineClient:
                 except (aiohttp.ContentTypeError, json.JSONDecodeError, TypeError) as err:
                     raise ParseError() from err
         except TimeoutError as err:
-            raise RequestTimeoutError(path) from err
+            logger.debug("Tiempo agotado al consultar %s", path, exc_info=err)
+            raise RequestTimeoutError(path, err) from err
         except aiohttp.ClientError as err:
-            raise TransportError(f"No se pudo conectar con TranvíaOnline ({path}).") from err
+            logger.debug("Fallo de red o TLS al consultar %s", path, exc_info=err)
+            raise TransportError(f"No se pudo conectar con TranvíaOnline ({path}).", err) from err
 
     async def _pace(self) -> None:
         """Separa las peticiones para no encadenarlas."""
@@ -290,6 +323,28 @@ def parse_occupancy(
         if current is None or parsed.updated_at >= current.updated_at:
             fresh[parsed.service] = parsed
     return fresh, stale
+
+
+def attach_occupancy(arrival: Arrival, fresh: dict[str, Occupancy], stale: set[str]) -> Arrival:
+    """Une la ocupación por número de servicio. Lo viejo o ausente queda desconocido."""
+    occupancy = fresh.get(arrival.service)
+    if occupancy is None:
+        return replace(
+            arrival,
+            occupancy_percent=None,
+            occupancy_fresh=False,
+            occupancy_updated_at=None,
+            vehicle_id=None,
+            occupancy_discarded=arrival.service in stale,
+        )
+    return replace(
+        arrival,
+        occupancy_percent=occupancy.percent,
+        occupancy_fresh=True,
+        occupancy_updated_at=occupancy.updated_at,
+        vehicle_id=occupancy.vehicle_id,
+        occupancy_discarded=False,
+    )
 
 
 def merge_occupancy(vehicle: Vehicle, fresh: dict[str, Occupancy], stale: set[str]) -> Vehicle:

@@ -6,6 +6,7 @@ mismo protocolo y se registra, sin cambiar el servidor MCP ni los modelos.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -144,18 +145,10 @@ def label_arrival(arrival: Arrival, catalog: Catalog) -> Arrival:
     destination = catalog.get(arrival.destination_code)
     if stop is None and destination is None:
         return arrival
-    return Arrival(
-        service=arrival.service,
-        stop_code=arrival.stop_code,
+    return replace(
+        arrival,
         stop_name=stop.name if stop else arrival.stop_name,
-        destination_code=arrival.destination_code,
         destination_name=destination.name if destination else arrival.destination_name,
-        line=arrival.line,
-        direction=arrival.direction,
-        minutes=arrival.minutes,
-        updated_at=arrival.updated_at,
-        order=arrival.order,
-        approximate=arrival.approximate,
     )
 
 

@@ -7,7 +7,7 @@ license = { text = "MIT" }
 requires-python = ">=3.11"
 authors = [{ name = "Yann" }]
 keywords = ["metrotenerife", "tranvia", "tenerife", "mcp", "home-assistant"]
-dependencies = ["aiohttp>=3.9"]
+dependencies = ["aiohttp>=3.9", "certifi>=2024.8.30"]
 
 [project.optional-dependencies]
 mcp = ["mcp>=2,<3"]

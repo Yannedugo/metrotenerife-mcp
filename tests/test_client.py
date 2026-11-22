@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ssl
 from datetime import UTC, datetime, timedelta
 
 import aiohttp
@@ -10,13 +11,20 @@ import pytest
 from metrotenerife.catalog import load_catalog
 from metrotenerife.client import (
     TranviaOnlineClient,
+    default_ssl_context,
     filter_arrivals,
     merge_occupancy,
     parse_arrivals,
     parse_occupancy,
     parse_vehicles,
 )
-from metrotenerife.errors import HttpStatusError, ParseError, RequestTimeoutError, StopNotFoundError
+from metrotenerife.errors import (
+    HttpStatusError,
+    ParseError,
+    RequestTimeoutError,
+    StopNotFoundError,
+    TransportError,
+)
 from metrotenerife.operators import label_arrival
 
 FROZEN = datetime(2026, 11, 22, 14, 7, tzinfo=UTC)
@@ -45,7 +53,9 @@ async def test_panel_uses_user_agent_cache_and_sorts(api) -> None:
     assert [item.minutes for item in first] == [11, 16]
     assert second[0].service == "405"
     assert api["hits"].count("INT") == 1
-    assert sleeps == []
+    assert api["hits"].count("occupancy") == 1
+    assert len(sleeps) == 1
+    assert sleeps[0] == pytest.approx(1, abs=0.05)
 
 
 async def test_unknown_code_does_not_call_the_network(api) -> None:
@@ -83,7 +93,8 @@ async def test_server_errors_backoff_then_succeed(api) -> None:
     async with _client(api, max_retries=2, sleeper=sleeper) as client:
         arrivals = await client.panel("FLKY")
     assert arrivals[0].stop_code == "INT"
-    assert api["hits"] == ["flaky", "flaky", "flaky"]
+    assert api["hits"][:3] == ["flaky", "flaky", "flaky"]
+    assert "occupancy" in api["hits"]
     assert sleeps == [0.0, 0.0]
 
 
@@ -223,3 +234,41 @@ async def test_session_is_not_closed_when_it_is_provided(api) -> None:
         await client.panel("INT")
         await client.aclose()
         assert not session.closed
+
+
+def test_ssl_context_keeps_verification_on() -> None:
+    context = default_ssl_context()
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+    assert context.get_ca_certs()
+
+
+async def test_connection_error_includes_the_real_cause() -> None:
+    class _Boom:
+        async def __aenter__(self):
+            raise aiohttp.ClientConnectionError(
+                "certificate verify failed: unable to get local issuer certificate"
+            )
+
+        async def __aexit__(self, *_exc: object) -> bool:
+            return False
+
+    class _Session:
+        closed = False
+
+        def get(self, *_args: object, **kwargs: object) -> _Boom:
+            context = kwargs["ssl"]
+            assert isinstance(context, ssl.SSLContext)
+            assert context.verify_mode == ssl.CERT_REQUIRED
+            return _Boom()
+
+        async def close(self) -> None:
+            self.closed = True
+
+    client = TranviaOnlineClient(_Session(), min_interval=0, max_retries=0)  # type: ignore[arg-type]
+    with pytest.raises(TransportError) as caught:
+        await client.panel("INT")
+    message = str(caught.value)
+    assert "ClientConnectionError" in message
+    assert "certificate verify failed" in message
+    assert caught.value.cause_type == "ClientConnectionError"

@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from metrotenerife.models import Arrival, Stop, direction_label
+from metrotenerife.models import OCCUPANCY_MEANING, Arrival, Stop, direction_label
 from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO
 
 
@@ -38,6 +38,12 @@ def arrival_payload(arrival: Arrival) -> dict[str, Any]:
         "servicio": arrival.service,
         "actualizado": arrival.updated_at.isoformat(),
         "aproximado": arrival.approximate,
+        "ocupacion_porcentaje": arrival.occupancy_percent if arrival.occupancy_fresh else None,
+        "ocupacion_fresca": arrival.occupancy_fresh,
+        "ocupacion_actualizada": (
+            arrival.occupancy_updated_at.isoformat() if arrival.occupancy_updated_at else None
+        ),
+        "ocupacion_significado": OCCUPANCY_MEANING,
     }
 
 

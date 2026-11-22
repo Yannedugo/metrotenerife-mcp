@@ -12,7 +12,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from metrotenerife import Arrival
-from metrotenerife.models import direction_label
+from metrotenerife.models import OCCUPANCY_MEANING, direction_label
 
 from . import MetrotenerifeConfigEntry
 from .const import (
@@ -99,6 +99,12 @@ def _arrival_attribute(arrival: Arrival) -> dict[str, Any]:
         "estimated_arrival": arrival.estimated_arrival.isoformat(),
         "service": arrival.service,
         "updated_at": arrival.updated_at.isoformat(),
+        "occupancy_percent": arrival.occupancy_percent if arrival.occupancy_fresh else None,
+        "occupancy_fresh": arrival.occupancy_fresh,
+        "occupancy_updated_at": (
+            arrival.occupancy_updated_at.isoformat() if arrival.occupancy_updated_at else None
+        ),
+        "occupancy_meaning": OCCUPANCY_MEANING,
     }
 
 
@@ -159,6 +165,11 @@ class NextTramSensor(_StopSensor):
             "destination_code": arrival.destination_code if arrival else None,
             "minutes": arrival.minutes if arrival else None,
             "service": arrival.service if arrival else None,
+            "occupancy_percent": (
+                arrival.occupancy_percent if arrival and arrival.occupancy_fresh else None
+            ),
+            "occupancy_fresh": arrival.occupancy_fresh if arrival else False,
+            "occupancy_meaning": OCCUPANCY_MEANING,
             "arrivals_count": len(arrivals),
             "arrivals": [_arrival_attribute(item) for item in arrivals[:MAX_ARRIVALS_ATTRIBUTE]],
             "source_updated_at": arrival.updated_at.isoformat() if arrival else None,
@@ -198,6 +209,9 @@ class MinutesSensor(_StopSensor):
             "service": arrival.service,
             "arriving": arrival.minutes == 0,
             "estimated_arrival": arrival.estimated_arrival.isoformat(),
+            "occupancy_percent": arrival.occupancy_percent if arrival.occupancy_fresh else None,
+            "occupancy_fresh": arrival.occupancy_fresh,
+            "occupancy_meaning": OCCUPANCY_MEANING,
         }
 
 
@@ -240,5 +254,10 @@ class LineNextTramSensor(_StopSensor):
             "direction": first.direction if first else None,
             "minutes": first.minutes if first else None,
             "service": first.service if first else None,
+            "occupancy_percent": (
+                first.occupancy_percent if first and first.occupancy_fresh else None
+            ),
+            "occupancy_fresh": first.occupancy_fresh if first else False,
+            "occupancy_meaning": OCCUPANCY_MEANING,
             "following_arrivals": [_arrival_attribute(item) for item in arrivals[1:4]],
         }

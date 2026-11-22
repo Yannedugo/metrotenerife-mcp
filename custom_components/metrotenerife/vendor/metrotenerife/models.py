@@ -91,6 +91,11 @@ class Arrival:
     updated_at: datetime
     order: int | None = None
     approximate: bool = False
+    occupancy_percent: int | None = None
+    occupancy_fresh: bool = False
+    occupancy_updated_at: datetime | None = None
+    vehicle_id: int | None = None
+    occupancy_discarded: bool = False
 
     @property
     def estimated_arrival(self) -> datetime:
@@ -111,6 +116,13 @@ class Arrival:
             "estimated_arrival": self.estimated_arrival.isoformat(),
             "order": self.order,
             "approximate": self.approximate,
+            "occupancy_percent": self.occupancy_percent,
+            "occupancy_fresh": self.occupancy_fresh,
+            "occupancy_updated_at": (
+                self.occupancy_updated_at.isoformat() if self.occupancy_updated_at else None
+            ),
+            "vehicle_id": self.vehicle_id,
+            "occupancy_discarded": self.occupancy_discarded,
         }
 
 
@@ -173,6 +185,14 @@ class VehicleSnapshot:
     vehicles: tuple[Vehicle, ...]
     fetched_at: datetime
     occupancy_available: bool
+
+
+# Metrotenerife describe CARGA como el porcentaje de pasajeros de la unidad
+# (termómetro en TranvíaOnline, octubre de 2020). No es un recuento de personas.
+OCCUPANCY_MEANING = (
+    "Porcentaje de pasajeros que lleva la unidad, según TranvíaOnline (campo CARGA). "
+    "Si falta o el dato es viejo, la ocupación es desconocida."
+)
 
 
 # Destinos habituales de cada sentido. En las terminales la fuente a veces no cuadra.

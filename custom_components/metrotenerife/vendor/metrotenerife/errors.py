@@ -6,6 +6,28 @@ Los mensajes están en español porque llegan a personas y a agentes.
 from __future__ import annotations
 
 
+def describe_exception(exc: BaseException) -> str:
+    """Tipo y mensaje breve, siguiendo la cadena de causas.
+
+    En un Mac con el Python de python.org, el fallo real suele ser
+    `CERTIFICATE_VERIFY_FAILED` dentro de otra excepción de aiohttp. El
+    mensaje genérico no basta para verlo.
+    """
+    parts: list[str] = []
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen and len(parts) < 3:
+        seen.add(id(current))
+        text = " ".join(str(current).split())
+        if len(text) > 160:
+            text = text[:157] + "..."
+        label = f"{type(current).__name__}: {text}" if text else type(current).__name__
+        if label not in parts:
+            parts.append(label)
+        current = current.__cause__ or current.__context__
+    return " | ".join(parts)
+
+
 class MetrotenerifeError(Exception):
     """Error base de la librería."""
 
@@ -43,13 +65,18 @@ class OperatorNotFoundError(MetrotenerifeError):
 class TransportError(MetrotenerifeError):
     """Fallo de red al hablar con la fuente en vivo."""
 
+    def __init__(self, message: str, cause: BaseException | None = None) -> None:
+        self.cause_type = type(cause).__name__ if cause else None
+        detail = describe_exception(cause) if cause else ""
+        super().__init__(f"{message} {detail}".strip())
+
 
 class RequestTimeoutError(TransportError):
     """La fuente en vivo no respondió dentro del tiempo límite."""
 
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, cause: BaseException | None = None) -> None:
         self.path = path
-        super().__init__("TranvíaOnline no respondió a tiempo.")
+        super().__init__(f"TranvíaOnline no respondió a tiempo ({path}).", cause)
 
 
 class HttpStatusError(TransportError):

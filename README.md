@@ -76,7 +76,7 @@ python3 -m venv .venv
 
 Luego abre [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-Elige una parada, o escribe parte del nombre. La lista se refresca sola cada 60 segundos y también con **Actualizar ahora**. El enlace **Ver en TranvíaOnline** abre el panel oficial de esa parada para comparar los minutos. Al final de la página está el JSON que devolvería la herramienta `proximos_tranvias` a un agente. Para cerrar el programa, vuelve a la terminal y pulsa Ctrl+C.
+Elige una parada, o escribe parte del nombre. Cada tranvía muestra los minutos y, si el dato es reciente, el porcentaje de ocupación. La lista se refresca sola cada 60 segundos y también con **Actualizar ahora**. El enlace **Ver en TranvíaOnline** abre el panel oficial de esa parada para comparar. Al final de la página está el JSON que devolvería la herramienta `proximos_tranvias` a un agente. Para cerrar el programa, vuelve a la terminal y pulsa Ctrl+C. Si no conecta, vuelve a lanzarlo con `--debug` (en Windows, `.venv\Scripts\metrotenerife-demo --debug`) y mira el mensaje: incluye la causa, por ejemplo un fallo de certificado.
 
 Si el puerto 8000 está ocupado: `metrotenerife-demo --port 8001` y abre `http://127.0.0.1:8001`. En Windows el comando es `.venv\Scripts\metrotenerife-demo --port 8001`.
 
@@ -84,7 +84,9 @@ Si el puerto 8000 está ocupado: `metrotenerife-demo --port 8001` y abre `http:/
 
 El cliente usa `aiohttp`, con tipos, tiempos de espera, caché de 20 segundos y como mucho una petición a la vez, separadas al menos un segundo. Ante un 429 o un 5xx reintenta dos veces, con espera creciente y respetando `Retry-After` (como máximo 30 segundos). El `User-Agent` identifica el proyecto y dice que el uso es personal.
 
-La ocupación (`/api/cargaVehiculo`) se une a cada tranvía por el número de servicio. Las filas con fecha vieja —servicios que ya no circulan— se descartan. Por defecto, «vieja» significa más de tres minutos.
+La ocupación (`/api/cargaVehiculo`, campo `CARGA`) se une a cada tranvía por el número de servicio. Metrotenerife la describe como el porcentaje de pasajeros de la unidad, el termómetro de TranvíaOnline. Si el dato tiene más de tres minutos o no hay fila para ese servicio, la ocupación queda desconocida: no se inventa un valor. Desde este entorno no se pudo leer `js/app/app.js` (el TLS con TranvíaOnline no llega a completarse), así que la barra de la demo es ese porcentaje y no una paleta de colores copiada del JavaScript oficial.
+
+Las peticiones verifican el certificado TLS con el almacén de `certifi`. Así funciona también el Python de python.org en macOS, que no trae raíces hasta ejecutar Install Certificates.command. La verificación no se desactiva. Si aun así falla, el mensaje incluye el tipo de excepción y un texto breve; `metrotenerife-demo --debug` escribe el detalle en la terminal.
 
 La búsqueda de paradas no distingue tildes ni mayúsculas: `guimera`, `GUIMERÁ` y `03` encuentran Teatro Guimerá.
 

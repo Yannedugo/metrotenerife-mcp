@@ -25,7 +25,7 @@ from metrotenerife.errors import (
     OperatorNotFoundError,
     StopNotFoundError,
 )
-from metrotenerife.models import Stop, Vehicle, direction_label
+from metrotenerife.models import OCCUPANCY_MEANING, Stop, Vehicle, direction_label
 from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, OperatorRegistry, TranviaOperator
 from metrotenerife.present import ambiguous_payload, proximos_payload, stop_payload
 
@@ -255,9 +255,11 @@ def _vehicle_payload(vehicle: Vehicle) -> dict[str, Any]:
         "lat": vehicle.lat,
         "lon": vehicle.lon,
         "ocupacion_porcentaje": vehicle.occupancy_percent,
+        "ocupacion_fresca": vehicle.occupancy_percent is not None,
         "vehiculo": vehicle.vehicle_id,
         "ocupacion_actualizada": updated.isoformat() if updated else None,
         "ocupacion_descartada": vehicle.occupancy_discarded,
+        "ocupacion_significado": OCCUPANCY_MEANING,
     }
 
 
