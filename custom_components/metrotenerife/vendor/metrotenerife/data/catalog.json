@@ -12,7 +12,7 @@
     "feed_start": "20240908",
     "feed_end": "20250715",
     "derived_on": "2026-11-22",
-    "note": "Catálogo derivado (paradas, coordenadas, líneas y orden). Se han restituido tildes que el CSV oficial omite. El feed está caducado y no se usan sus horarios ni frecuencias. Los sentidos son los de TranvíaOnline, no el direction_id del GTFS."
+    "note": "Catálogo derivado (paradas, coordenadas, líneas, orden y minutos entre paradas consecutivas). Esos minutos solo sirven para estimar un tranvía que la API no anuncia; no son un horario. Se han restituido tildes que el CSV oficial omite. El feed está caducado. Los sentidos son los de TranvíaOnline."
   },
   "lines": [
     {
@@ -49,6 +49,28 @@
             "ANC",
             "TRI"
           ],
+          "segment_seconds": [
+            120,
+            120,
+            120,
+            60,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            60,
+            120,
+            60,
+            120,
+            120
+          ],
           "gtfs_trip_id": "IT"
         },
         {
@@ -79,6 +101,28 @@
             "FUN",
             "INT"
           ],
+          "segment_seconds": [
+            120,
+            120,
+            60,
+            120,
+            60,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            120,
+            60,
+            120,
+            120,
+            120
+          ],
           "gtfs_trip_id": "TI"
         }
       ]
@@ -102,6 +146,13 @@
             "ING",
             "CUE"
           ],
+          "segment_seconds": [
+            120,
+            120,
+            120,
+            120,
+            120
+          ],
           "gtfs_trip_id": "TL"
         },
         {
@@ -116,6 +167,13 @@
             "CAR",
             "JER",
             "TIN"
+          ],
+          "segment_seconds": [
+            60,
+            120,
+            120,
+            120,
+            120
           ],
           "gtfs_trip_id": "LT"
         }

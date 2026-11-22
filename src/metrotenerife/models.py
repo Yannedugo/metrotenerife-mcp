@@ -45,6 +45,7 @@ class Direction:
     destination_code: str
     destination_name: str
     stop_codes: tuple[str, ...]
+    segment_seconds: tuple[int, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -53,6 +54,7 @@ class Direction:
             "destination_code": self.destination_code,
             "destination_name": self.destination_name,
             "stop_codes": list(self.stop_codes),
+            "segment_seconds": list(self.segment_seconds),
         }
 
 
@@ -92,10 +94,14 @@ class Arrival:
     order: int | None = None
     approximate: bool = False
     occupancy_percent: int | None = None
+    occupancy_raw: int | None = None
     occupancy_fresh: bool = False
+    occupancy_high: bool = False
     occupancy_updated_at: datetime | None = None
     vehicle_id: int | None = None
     occupancy_discarded: bool = False
+    estimated: bool = False
+    origin: str = "tranviaonline"
 
     @property
     def estimated_arrival(self) -> datetime:
@@ -117,7 +123,11 @@ class Arrival:
             "order": self.order,
             "approximate": self.approximate,
             "occupancy_percent": self.occupancy_percent,
+            "occupancy_raw": self.occupancy_raw,
             "occupancy_fresh": self.occupancy_fresh,
+            "occupancy_high": self.occupancy_high,
+            "estimated": self.estimated,
+            "origin": self.origin,
             "occupancy_updated_at": (
                 self.occupancy_updated_at.isoformat() if self.occupancy_updated_at else None
             ),
@@ -131,7 +141,7 @@ class Occupancy:
     """Ocupación reciente de un servicio."""
 
     service: str
-    percent: int
+    raw: int
     updated_at: datetime
     vehicle_id: int | None = None
 
@@ -152,6 +162,8 @@ class Vehicle:
     destination_name: str
     order: int | None = None
     occupancy_percent: int | None = None
+    occupancy_raw: int | None = None
+    occupancy_high: bool = False
     vehicle_id: int | None = None
     occupancy_updated_at: datetime | None = None
     occupancy_discarded: bool = False
@@ -170,6 +182,8 @@ class Vehicle:
             "destination_name": self.destination_name,
             "order": self.order,
             "occupancy_percent": self.occupancy_percent,
+            "occupancy_raw": self.occupancy_raw,
+            "occupancy_high": self.occupancy_high,
             "vehicle_id": self.vehicle_id,
             "occupancy_updated_at": (
                 self.occupancy_updated_at.isoformat() if self.occupancy_updated_at else None
@@ -185,14 +199,6 @@ class VehicleSnapshot:
     vehicles: tuple[Vehicle, ...]
     fetched_at: datetime
     occupancy_available: bool
-
-
-# Metrotenerife describe CARGA como el porcentaje de pasajeros de la unidad
-# (termómetro en TranvíaOnline, octubre de 2020). No es un recuento de personas.
-OCCUPANCY_MEANING = (
-    "Porcentaje de pasajeros que lleva la unidad, según TranvíaOnline (campo CARGA). "
-    "Si falta o el dato es viejo, la ocupación es desconocida."
-)
 
 
 # Destinos habituales de cada sentido. En las terminales la fuente a veces no cuadra.

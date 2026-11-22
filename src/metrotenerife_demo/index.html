@@ -95,8 +95,17 @@
     .termometro > span {
       display: block;
       height: 100%;
-      background: var(--verde);
+      background: #1565c0;
     }
+    .termometro.alta > span { background: #b42318; }
+    .estimado {
+      margin-left: 0.4rem;
+      font-size: 0.75rem;
+      border: 1px solid currentColor;
+      border-radius: 99px;
+      padding: 0 0.35rem;
+    }
+    .aviso-ocupacion { color: #b42318; margin: 0.2rem 0 0; }
     .llegando { color: var(--verde); }
     h2 { font-size: 1.05rem; margin: 0 0 0.2rem; }
     pre {
@@ -265,25 +274,46 @@
           fila.className = "fila";
           const servicio = document.createElement("span");
           texto(servicio, "Servicio " + llegada.servicio);
+          if (llegada.estimado) {
+            const marca = document.createElement("span");
+            marca.className = "estimado";
+            texto(marca, "estimado");
+            servicio.append(marca);
+          }
           const derecha = document.createElement("span");
           derecha.className = "minutos" + (llegada.llegando ? " llegando" : "");
           const ocupacion = document.createElement("span");
           ocupacion.className = "ocupacion";
           if (llegada.ocupacion_fresca && llegada.ocupacion_porcentaje != null) {
             const barra = document.createElement("span");
-            barra.className = "termometro";
+            barra.className = "termometro" + (llegada.ocupacion_muy_alta ? " alta" : "");
             const relleno = document.createElement("span");
             const ancho = Math.max(0, Math.min(100, llegada.ocupacion_porcentaje));
             relleno.style.width = ancho + "%";
             barra.append(relleno);
-            ocupacion.append(barra, document.createTextNode(llegada.ocupacion_porcentaje + " %"));
-            ocupacion.title = "Porcentaje de pasajeros en la unidad";
+            const etiqueta = llegada.ocupacion_muy_alta
+              ? llegada.ocupacion_aviso
+              : (llegada.ocupacion_texto || ("OCUPACIÓN: " + llegada.ocupacion_porcentaje + "%"));
+            ocupacion.append(barra, document.createTextNode(" " + llegada.ocupacion_porcentaje + " %"));
+            ocupacion.title = etiqueta;
           } else {
-            texto(ocupacion, "Ocupación desconocida");
+            texto(ocupacion, "CARGANDO OCUPACIÓN");
           }
           texto(derecha, llegada.llegando ? "Llegando" : llegada.minutos + " min");
           fila.append(servicio, ocupacion, derecha);
           bloque.append(fila);
+          if (llegada.ocupacion_muy_alta && llegada.ocupacion_aviso) {
+            const avisoOcupacion = document.createElement("p");
+            avisoOcupacion.className = "aviso-ocupacion";
+            texto(avisoOcupacion, llegada.ocupacion_aviso);
+            bloque.append(avisoOcupacion);
+          }
+        }
+        if (grupo.length < 3) {
+          const hueco = document.createElement("p");
+          hueco.className = "meta";
+          texto(hueco, "3.er tranvía no disponible: no se puede estimar sin inventar una vuelta en cabecera.");
+          bloque.append(hueco);
         }
         lista.append(bloque);
       }

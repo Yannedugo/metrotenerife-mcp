@@ -9,7 +9,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from metrotenerife.models import OCCUPANCY_MEANING, Arrival, Stop, direction_label
+from metrotenerife.models import Arrival, Stop, direction_label
+from metrotenerife.occupancy import OCCUPANCY_MEANING, occupancy_texts
 from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO
 
 
@@ -38,13 +39,26 @@ def arrival_payload(arrival: Arrival) -> dict[str, Any]:
         "servicio": arrival.service,
         "actualizado": arrival.updated_at.isoformat(),
         "aproximado": arrival.approximate,
+        "estimado": arrival.estimated,
+        "origen": arrival.origin,
+        "ocupacion_cruda": arrival.occupancy_raw if arrival.occupancy_fresh else None,
         "ocupacion_porcentaje": arrival.occupancy_percent if arrival.occupancy_fresh else None,
         "ocupacion_fresca": arrival.occupancy_fresh,
+        "ocupacion_muy_alta": arrival.occupancy_high if arrival.occupancy_fresh else False,
+        "ocupacion_texto": _occupancy_label(arrival)[0],
+        "ocupacion_aviso": _occupancy_label(arrival)[1],
         "ocupacion_actualizada": (
             arrival.occupancy_updated_at.isoformat() if arrival.occupancy_updated_at else None
         ),
         "ocupacion_significado": OCCUPANCY_MEANING,
     }
+
+
+def _occupancy_label(arrival: Arrival) -> tuple[str | None, str | None]:
+    if not arrival.occupancy_fresh or arrival.occupancy_raw is None:
+        return None, None
+    text, warning = occupancy_texts(arrival.occupancy_raw)
+    return text or None, warning or None
 
 
 def proximos_payload(
@@ -56,9 +70,11 @@ def proximos_payload(
     line: int | None,
     direction: int | None,
     destination: str | None,
+    per_direction: int = 3,
+    notes: list[dict[str, object]] | None = None,
 ) -> dict[str, Any]:
     """El objeto que serializa la herramienta `proximos_tranvias`."""
-    updated = [arrival.updated_at for arrival in arrivals]
+    updated = [arrival.updated_at for arrival in arrivals if not arrival.estimated]
     return {
         "aviso": AVISO_EN_VIVO,
         "operador": operator_id,
@@ -66,8 +82,10 @@ def proximos_payload(
         "actualizacion_fuente": max(updated).isoformat() if updated else None,
         "parada": stop_payload(stop),
         "filtros": {"linea": line, "sentido": direction, "destino": destination},
+        "por_sentido": per_direction,
         "mensaje": None if arrivals else "No hay tranvías anunciados con ese filtro.",
         "llegadas": [arrival_payload(arrival) for arrival in arrivals],
+        "notas_estimacion": notes or [],
     }
 
 

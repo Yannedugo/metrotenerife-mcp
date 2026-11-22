@@ -12,7 +12,8 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from metrotenerife import Arrival
-from metrotenerife.models import OCCUPANCY_MEANING, direction_label
+from metrotenerife.models import direction_label
+from metrotenerife.occupancy import OCCUPANCY_MEANING
 
 from . import MetrotenerifeConfigEntry
 from .const import (
@@ -66,6 +67,22 @@ async def async_setup_entry(
                 subentry.title,
                 str(subentry.data[CONF_STOP_CODE]),
             ),
+            FollowingTramSensor(
+                coordinator,
+                subentry.subentry_id,
+                subentry.title,
+                str(subentry.data[CONF_STOP_CODE]),
+                1,
+                "second_tram",
+            ),
+            FollowingTramSensor(
+                coordinator,
+                subentry.subentry_id,
+                subentry.title,
+                str(subentry.data[CONF_STOP_CODE]),
+                2,
+                "third_tram",
+            ),
             MinutesSensor(
                 coordinator,
                 subentry.subentry_id,
@@ -73,7 +90,12 @@ async def async_setup_entry(
                 str(subentry.data[CONF_STOP_CODE]),
             ),
         ]
-        active = {f"{subentry.subentry_id}_next_tram", f"{subentry.subentry_id}_minutes"}
+        active = {
+            f"{subentry.subentry_id}_next_tram",
+            f"{subentry.subentry_id}_second_tram",
+            f"{subentry.subentry_id}_third_tram",
+            f"{subentry.subentry_id}_minutes",
+        }
         for line in lines:
             sensor = LineNextTramSensor(
                 coordinator,
@@ -99,7 +121,11 @@ def _arrival_attribute(arrival: Arrival) -> dict[str, Any]:
         "estimated_arrival": arrival.estimated_arrival.isoformat(),
         "service": arrival.service,
         "updated_at": arrival.updated_at.isoformat(),
+        "estimated": arrival.estimated,
+        "origin": arrival.origin,
+        "occupancy_raw": arrival.occupancy_raw if arrival.occupancy_fresh else None,
         "occupancy_percent": arrival.occupancy_percent if arrival.occupancy_fresh else None,
+        "occupancy_high": arrival.occupancy_high if arrival.occupancy_fresh else False,
         "occupancy_fresh": arrival.occupancy_fresh,
         "occupancy_updated_at": (
             arrival.occupancy_updated_at.isoformat() if arrival.occupancy_updated_at else None
@@ -121,9 +147,26 @@ class _StopSensor(MetrotenerifeStopEntity, SensorEntity):
     def _arrivals(self) -> list[Arrival]:
         return self.coordinator.arrivals_for(self._subentry())
 
-    def _next(self) -> Arrival | None:
+    def _group(self) -> list[Arrival]:
+        """Hasta tres llegadas del mismo sentido que el próximo tranvía."""
         arrivals = self._arrivals()
-        return arrivals[0] if arrivals else None
+        if not arrivals:
+            return []
+        first = arrivals[0]
+        return [
+            arrival
+            for arrival in arrivals
+            if arrival.line == first.line
+            and arrival.direction == first.direction
+            and arrival.destination_code == first.destination_code
+        ][:3]
+
+    def _ranked(self, index: int) -> Arrival | None:
+        group = self._group()
+        return group[index] if index < len(group) else None
+
+    def _next(self) -> Arrival | None:
+        return self._ranked(0)
 
 
 class NextTramSensor(_StopSensor):
@@ -165,16 +208,54 @@ class NextTramSensor(_StopSensor):
             "destination_code": arrival.destination_code if arrival else None,
             "minutes": arrival.minutes if arrival else None,
             "service": arrival.service if arrival else None,
+            "occupancy_raw": arrival.occupancy_raw if arrival and arrival.occupancy_fresh else None,
             "occupancy_percent": (
                 arrival.occupancy_percent if arrival and arrival.occupancy_fresh else None
             ),
+            "occupancy_high": bool(arrival and arrival.occupancy_fresh and arrival.occupancy_high),
             "occupancy_fresh": arrival.occupancy_fresh if arrival else False,
+            "estimated": arrival.estimated if arrival else False,
+            "origin": arrival.origin if arrival else None,
             "occupancy_meaning": OCCUPANCY_MEANING,
             "arrivals_count": len(arrivals),
             "arrivals": [_arrival_attribute(item) for item in arrivals[:MAX_ARRIVALS_ATTRIBUTE]],
             "source_updated_at": arrival.updated_at.isoformat() if arrival else None,
             "fetched_at": data.fetched_at.isoformat() if data else None,
         }
+
+
+class FollowingTramSensor(_StopSensor):
+    """Segundo o tercer tranvía del mismo sentido. El tercero puede ser estimado."""
+
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _attr_icon = "mdi:tram"
+
+    def __init__(
+        self,
+        coordinator: TranviaCoordinator,
+        subentry_id: str,
+        title: str,
+        stop_code: str,
+        index: int,
+        translation_key: str,
+    ) -> None:
+        super().__init__(coordinator, subentry_id, title, stop_code)
+        self._index = index
+        self._attr_translation_key = translation_key
+        suffix = "second_tram" if index == 1 else "third_tram"
+        self._attr_unique_id = f"{subentry_id}_{suffix}"
+
+    @property
+    def native_value(self) -> datetime | None:
+        arrival = self._ranked(self._index)
+        return arrival.estimated_arrival if arrival else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        arrival = self._ranked(self._index)
+        if arrival is None:
+            return {"estimated": False, "origin": None, "available_arrival": False}
+        return _arrival_attribute(arrival) | {"available_arrival": True}
 
 
 class MinutesSensor(_StopSensor):

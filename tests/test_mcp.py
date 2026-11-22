@@ -43,7 +43,8 @@ async def test_tools_against_a_local_fake(api) -> None:
         assert live["actualizacion_fuente"] == "2026-11-22T14:06:54+00:00"
         assert live["llegadas"][0]["minutos"] == 11
         assert live["llegadas"][0]["destino"] == "La Trinidad"
-        assert live["llegadas"][0]["ocupacion_porcentaje"] == 28
+        assert live["llegadas"][0]["ocupacion_cruda"] == 28
+        assert live["llegadas"][0]["ocupacion_porcentaje"] == 33
         assert live["llegadas"][0]["ocupacion_fresca"] is True
         assert live["parada"]["codigo"] == "INT"
 

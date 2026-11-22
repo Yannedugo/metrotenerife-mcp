@@ -105,6 +105,12 @@
       "next_tram": {
         "name": "Next tram"
       },
+      "second_tram": {
+        "name": "Second tram"
+      },
+      "third_tram": {
+        "name": "Third tram"
+      },
       "minutes": {
         "name": "Minutes"
       },

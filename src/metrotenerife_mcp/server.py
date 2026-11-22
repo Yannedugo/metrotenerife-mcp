@@ -25,7 +25,8 @@ from metrotenerife.errors import (
     OperatorNotFoundError,
     StopNotFoundError,
 )
-from metrotenerife.models import OCCUPANCY_MEANING, Stop, Vehicle, direction_label
+from metrotenerife.models import Stop, Vehicle, direction_label
+from metrotenerife.occupancy import OCCUPANCY_MEANING
 from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, OperatorRegistry, TranviaOperator
 from metrotenerife.present import ambiguous_payload, proximos_payload, stop_payload
 
@@ -90,17 +91,24 @@ def build_server(**client_kwargs: Any) -> MCPServer:
         linea: int | None = None,
         sentido: int | None = None,
         destino: str | None = None,
+        por_sentido: int = 3,
         operador: str = "tranvia",
         *,
         ctx: Context,
     ) -> str:
-        """Llegadas en vivo de una parada."""
+        """Llegadas en vivo. Lo que pase de las anunciadas por sentido va marcado como estimado."""
         _validate_filters(linea, sentido)
+        if por_sentido < 1 or por_sentido > 6:
+            raise ToolError("por_sentido tiene que estar entre 1 y 6.")
         registry = _registry(ctx)
         operator = _operator(registry, operador)
         try:
-            stop, arrivals, fetched_at = await operator.arrivals(
-                parada, line=linea, direction=sentido, destination=destino
+            stop, arrivals, fetched_at, notes = await operator.arrivals(
+                parada,
+                line=linea,
+                direction=sentido,
+                destination=destino,
+                per_direction=por_sentido,
             )
         except AmbiguousStopError as err:
             matches = [match for match in err.matches if isinstance(match, Stop)]
@@ -118,6 +126,8 @@ def build_server(**client_kwargs: Any) -> MCPServer:
                 line=linea,
                 direction=sentido,
                 destination=destino,
+                per_direction=por_sentido,
+                notes=notes,
             )
         )
 
@@ -254,7 +264,9 @@ def _vehicle_payload(vehicle: Vehicle) -> dict[str, Any]:
         "minutos_proxima_parada": vehicle.minutes_to_next,
         "lat": vehicle.lat,
         "lon": vehicle.lon,
+        "ocupacion_cruda": vehicle.occupancy_raw,
         "ocupacion_porcentaje": vehicle.occupancy_percent,
+        "ocupacion_muy_alta": vehicle.occupancy_high,
         "ocupacion_fresca": vehicle.occupancy_percent is not None,
         "vehiculo": vehicle.vehicle_id,
         "ocupacion_actualizada": updated.isoformat() if updated else None,

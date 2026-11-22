@@ -89,6 +89,11 @@ def _online_code(stop_url: str) -> str:
     return stop_url.rstrip("/").rsplit("/", 1)[-1].strip().upper()
 
 
+def _clock_seconds(value: str) -> int:
+    hours, minutes, seconds = (int(part) for part in value.split(":"))
+    return hours * 3600 + minutes * 60 + seconds
+
+
 def build(gtfs_zip: Path) -> dict[str, object]:
     with zipfile.ZipFile(gtfs_zip) as archive:
         stops_rows = _read_zip_csv(archive, "stops.txt")
@@ -116,16 +121,22 @@ def build(gtfs_zip: Path) -> dict[str, object]:
             }
         )
 
-    sequences: dict[str, list[str]] = {}
+    sequences: dict[str, list[tuple[str, int]]] = {}
     for row in sorted(stop_times, key=lambda item: (item["trip_id"], int(item["stop_sequence"]))):
         trip_id = row["trip_id"]
         if trip_id not in TRIP_TO_DIRECTION:
             continue
-        sequences.setdefault(trip_id, []).append(code_by_gtfs[row["stop_id"]])
+        sequences.setdefault(trip_id, []).append(
+            (code_by_gtfs[row["stop_id"]], _clock_seconds(row["arrival_time"]))
+        )
 
     directions: list[dict[str, object]] = []
     for trip_id, (line, direction) in TRIP_TO_DIRECTION.items():
-        codes = sequences[trip_id]
+        timed = sequences[trip_id]
+        codes = [code for code, _moment in timed]
+        segments = [timed[index + 1][1] - timed[index][1] for index in range(len(timed) - 1)]
+        if any(segment < 0 for segment in segments):
+            raise SystemExit(f"Tiempos negativos en el viaje {trip_id}")
         destination = codes[-1]
         directions.append(
             {
@@ -134,6 +145,7 @@ def build(gtfs_zip: Path) -> dict[str, object]:
                 "destination_code": destination,
                 "destination_name": DESTINATION_NAMES[destination],
                 "stop_codes": codes,
+                "segment_seconds": segments,
                 "gtfs_trip_id": trip_id,
             }
         )
@@ -164,10 +176,11 @@ def build(gtfs_zip: Path) -> dict[str, object]:
             "feed_end": feed_end,
             "derived_on": "2026-11-22",
             "note": (
-                "Catálogo derivado (paradas, coordenadas, líneas y orden). "
+                "Catálogo derivado (paradas, coordenadas, líneas, orden y minutos "
+                "entre paradas consecutivas). Esos minutos solo sirven para estimar "
+                "un tranvía que la API no anuncia; no son un horario. "
                 "Se han restituido tildes que el CSV oficial omite. "
-                "El feed está caducado y no se usan sus horarios ni frecuencias. "
-                "Los sentidos son los de TranvíaOnline, no el direction_id del GTFS."
+                "El feed está caducado. Los sentidos son los de TranvíaOnline."
             ),
         },
         "lines": [

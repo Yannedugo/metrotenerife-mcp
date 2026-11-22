@@ -48,6 +48,9 @@ class Catalog:
                     destination_code=str(direction["destination_code"]),
                     destination_name=str(direction["destination_name"]),
                     stop_codes=tuple(str(code) for code in direction["stop_codes"]),
+                    segment_seconds=tuple(
+                        int(seconds) for seconds in direction.get("segment_seconds") or ()
+                    ),
                 )
                 for direction in item["directions"]  # type: ignore[index]
             )
@@ -90,6 +93,15 @@ class Catalog:
         for item in self.lines:
             if item.line == number:
                 return item
+        return None
+
+    def direction_of(self, line: int, direction: int) -> Direction | None:
+        item = self.line(line)
+        if item is None:
+            return None
+        for route in item.directions:
+            if route.direction == direction:
+                return route
         return None
 
     def lines_serving(self, stop_code: str) -> tuple[int, ...]:

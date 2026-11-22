@@ -12,7 +12,13 @@ from typing import Protocol
 
 from metrotenerife.catalog import Catalog, load_catalog
 from metrotenerife.client import TranviaOnlineClient, filter_arrivals
-from metrotenerife.errors import AmbiguousStopError, OperatorNotFoundError, StopNotFoundError
+from metrotenerife.errors import (
+    AmbiguousStopError,
+    MetrotenerifeError,
+    OperatorNotFoundError,
+    StopNotFoundError,
+)
+from metrotenerife.estimate import limit_per_direction
 from metrotenerife.models import Arrival, Line, Stop, Vehicle, VehicleSnapshot
 from metrotenerife.text import fold
 
@@ -46,8 +52,9 @@ class TransitOperator(Protocol):
         line: int | None = None,
         direction: int | None = None,
         destination: str | None = None,
-    ) -> tuple[Stop, list[Arrival], datetime]:
-        """Parada resuelta, llegadas filtradas y momento de la consulta."""
+        per_direction: int = 3,
+    ) -> tuple[Stop, list[Arrival], datetime, list[dict[str, object]]]:
+        """Parada, llegadas (hasta N por sentido) y notas si no hubo estimación."""
 
     async def vehicles(self, *, line: int | None = None) -> VehicleSnapshot:
         """Posición de los vehículos, opcionalmente de una sola línea."""
@@ -119,13 +126,26 @@ class TranviaOperator:
         line: int | None = None,
         direction: int | None = None,
         destination: str | None = None,
-    ) -> tuple[Stop, list[Arrival], datetime]:
+        per_direction: int = 3,
+    ) -> tuple[Stop, list[Arrival], datetime, list[dict[str, object]]]:
         resolved = self.resolve_stop(stop)
         fetched_at = datetime.now(UTC)
         raw = await self._client.panel(resolved.code)
         named = [label_arrival(arrival, self.catalog) for arrival in raw]
         filtered = filter_arrivals(named, line=line, direction=direction, destination=destination)
-        return resolved, filtered, fetched_at
+        try:
+            snapshot = await self._client.vehicles()
+            vehicles = list(snapshot.vehicles)
+        except MetrotenerifeError:
+            vehicles = []
+        board, notes = limit_per_direction(
+            filtered,
+            vehicles,
+            self.catalog,
+            per_direction=per_direction,
+            now=fetched_at,
+        )
+        return resolved, board, fetched_at, notes
 
     async def vehicles(self, *, line: int | None = None) -> VehicleSnapshot:
         snapshot = await self._client.vehicles()

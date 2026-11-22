@@ -105,6 +105,12 @@
       "next_tram": {
         "name": "Próximo tranvía"
       },
+      "second_tram": {
+        "name": "Segundo tranvía"
+      },
+      "third_tram": {
+        "name": "Tercer tranvía"
+      },
       "minutes": {
         "name": "Minutos"
       },

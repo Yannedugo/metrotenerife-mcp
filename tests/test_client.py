@@ -194,11 +194,13 @@ def test_occupancy_drops_stale_rows(fixture) -> None:
         max_age=timedelta(seconds=180),
     )
     assert set(fresh) == {"405"}
-    assert fresh["405"].percent == 28
+    assert fresh["405"].raw == 28
     assert fresh["405"].vehicle_id == 102
     assert "409" in stale and "999" in stale
     merged = {vehicle.service: merge_occupancy(vehicle, fresh, stale) for vehicle in vehicles}
-    assert merged["405"].occupancy_percent == 28
+    assert merged["405"].occupancy_raw == 28
+    assert merged["405"].occupancy_percent == 33
+    assert merged["405"].occupancy_high is False
     assert merged["409"].occupancy_percent is None
     assert merged["409"].occupancy_discarded is True
 

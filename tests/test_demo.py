@@ -57,7 +57,9 @@ async def test_arrivals_match_the_agent_payload_and_use_the_cache(api) -> None:
     assert body["parada"]["codigo"] == "INT"
     assert [item["minutos"] for item in body["llegadas"]] == [11, 16]
     assert body["llegadas"][0]["destino"] == "La Trinidad"
-    assert body["llegadas"][0]["ocupacion_porcentaje"] == 28
+    assert body["llegadas"][0]["ocupacion_cruda"] == 28
+    assert body["llegadas"][0]["ocupacion_porcentaje"] == 33
+    assert body["llegadas"][0]["ocupacion_muy_alta"] is False
     assert body["llegadas"][0]["ocupacion_fresca"] is True
     assert body["llegadas"][1]["ocupacion_porcentaje"] is None
     assert body["llegadas"][1]["ocupacion_fresca"] is False

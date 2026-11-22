@@ -66,7 +66,9 @@ async def _arrivals(request: web.Request) -> web.Response:
     except ValueError as err:
         return _error(str(err), 400)
     try:
-        stop, arrivals, fetched_at = await operator.arrivals(stop_query, line=line)
+        stop, arrivals, fetched_at, notes = await operator.arrivals(
+            stop_query, line=line, per_direction=3
+        )
     except AmbiguousStopError as err:
         matches = [match for match in err.matches if isinstance(match, Stop)]
         return web.json_response(ambiguous_payload(operator.id, stop_query, matches, str(err)))
@@ -83,6 +85,8 @@ async def _arrivals(request: web.Request) -> web.Response:
             line=line,
             direction=None,
             destination=None,
+            per_direction=3,
+            notes=notes,
         )
     )
 

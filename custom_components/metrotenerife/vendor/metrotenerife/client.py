@@ -31,6 +31,7 @@ from metrotenerife.errors import (
     TransportError,
 )
 from metrotenerife.models import Arrival, Occupancy, Vehicle, VehicleSnapshot
+from metrotenerife.occupancy import HIGH_CARGA, normalize_carga
 
 logger = logging.getLogger(__name__)
 
@@ -339,7 +340,9 @@ def attach_occupancy(arrival: Arrival, fresh: dict[str, Occupancy], stale: set[s
         )
     return replace(
         arrival,
-        occupancy_percent=occupancy.percent,
+        occupancy_raw=occupancy.raw,
+        occupancy_percent=normalize_carga(occupancy.raw),
+        occupancy_high=occupancy.raw >= HIGH_CARGA,
         occupancy_fresh=True,
         occupancy_updated_at=occupancy.updated_at,
         vehicle_id=occupancy.vehicle_id,
@@ -352,35 +355,23 @@ def merge_occupancy(vehicle: Vehicle, fresh: dict[str, Occupancy], stale: set[st
     if occupancy is None:
         if vehicle.service not in stale:
             return vehicle
-        return Vehicle(
-            service=vehicle.service,
-            lat=vehicle.lat,
-            lon=vehicle.lon,
-            line=vehicle.line,
-            direction=vehicle.direction,
-            minutes_to_next=vehicle.minutes_to_next,
-            next_stop_code=vehicle.next_stop_code,
-            next_stop_name=vehicle.next_stop_name,
-            destination_code=vehicle.destination_code,
-            destination_name=vehicle.destination_name,
-            order=vehicle.order,
+        return replace(
+            vehicle,
+            occupancy_percent=None,
+            occupancy_raw=None,
+            occupancy_high=False,
+            vehicle_id=None,
+            occupancy_updated_at=None,
             occupancy_discarded=True,
         )
-    return Vehicle(
-        service=vehicle.service,
-        lat=vehicle.lat,
-        lon=vehicle.lon,
-        line=vehicle.line,
-        direction=vehicle.direction,
-        minutes_to_next=vehicle.minutes_to_next,
-        next_stop_code=vehicle.next_stop_code,
-        next_stop_name=vehicle.next_stop_name,
-        destination_code=vehicle.destination_code,
-        destination_name=vehicle.destination_name,
-        order=vehicle.order,
-        occupancy_percent=occupancy.percent,
+    return replace(
+        vehicle,
+        occupancy_raw=occupancy.raw,
+        occupancy_percent=normalize_carga(occupancy.raw),
+        occupancy_high=occupancy.raw >= HIGH_CARGA,
         vehicle_id=occupancy.vehicle_id,
         occupancy_updated_at=occupancy.updated_at,
+        occupancy_discarded=False,
     )
 
 
@@ -528,7 +519,7 @@ def _parse_occupancy_item(item: dict[str, Any]) -> Occupancy | None:
     if not service:
         return None
     try:
-        percent = int(item["CARGA"])
+        raw = int(item["CARGA"])
         updated_at = _parse_local(str(item["FECHA"]))
     except (KeyError, TypeError, ValueError):
         return None
@@ -536,7 +527,7 @@ def _parse_occupancy_item(item: dict[str, Any]) -> Occupancy | None:
     vehicle_id = (
         int(vehicle) if isinstance(vehicle, int | float | str) and str(vehicle).isdigit() else None
     )
-    return Occupancy(service=service, percent=percent, updated_at=updated_at, vehicle_id=vehicle_id)
+    return Occupancy(service=service, raw=raw, updated_at=updated_at, vehicle_id=vehicle_id)
 
 
 def _timestamp(item: dict[str, Any], now: datetime) -> tuple[datetime, bool]:
