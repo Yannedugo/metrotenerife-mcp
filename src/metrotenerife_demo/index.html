@@ -98,13 +98,15 @@
       background: #1565c0;
     }
     .termometro.alta > span { background: #b42318; }
-    .estimado {
+    .estimado, .tipo {
       margin-left: 0.4rem;
       font-size: 0.75rem;
       border: 1px solid currentColor;
       border-radius: 99px;
       padding: 0 0.35rem;
     }
+    .tipo.en_vivo { color: var(--verde); }
+    .tipo.previsto { color: var(--suave); }
     .aviso-ocupacion { color: #b42318; margin: 0.2rem 0 0; }
     .detalle { margin: 0 0 0.6rem; color: var(--suave); }
     .detalle summary { cursor: pointer; }
@@ -159,6 +161,12 @@
     <p class="error" id="error" hidden></p>
     <div id="lista"></div>
 
+    <section id="prevision" class="panel" hidden>
+      <h2>Próximas horas</h2>
+      <p class="meta">Previsión teórica con las frecuencias publicadas y los minutos entre paradas del catálogo. No es un horario oficial. Si el paso es de ahora mismo, se marca en vivo o estimado.</p>
+      <div id="prevision-lista"></div>
+    </section>
+
     <details>
       <summary>JSON que recibiría un agente con <code>proximos_tranvias</code></summary>
       <pre id="json">Elige una parada.</pre>
@@ -178,6 +186,8 @@
     const refrescar = document.getElementById("refrescar");
     const oficial = document.getElementById("oficial");
     const lista = document.getElementById("lista");
+    const prevision = document.getElementById("prevision");
+    const previsionLista = document.getElementById("prevision-lista");
     const error = document.getElementById("error");
     const json = document.getElementById("json");
     const reloj = document.getElementById("reloj");
@@ -353,11 +363,59 @@
         }
         pintarLlegadas(datos);
         reloj.textContent = "Se actualiza sola cada 60 segundos. La librería guarda la respuesta 20 segundos para no insistir.";
+        await cargarPrevision(codigo);
       } catch (err) {
         mostrarError("No hay conexión con la página local.");
       } finally {
         cargando = false;
         refrescar.disabled = false;
+      }
+    }
+
+    function pintarPrevision(datos) {
+      prevision.hidden = false;
+      previsionLista.replaceChildren();
+      if (datos.mensaje) {
+        const vacio = document.createElement("p");
+        texto(vacio, datos.mensaje);
+        previsionLista.append(vacio);
+        return;
+      }
+      for (const paso of datos.pasos || []) {
+        const fila = document.createElement("div");
+        fila.className = "fila";
+        const textoPaso = document.createElement("span");
+        texto(
+          textoPaso,
+          hora(paso.hora) + " · L" + paso.linea + " " + paso.sentido_etiqueta
+          + " · " + paso.destino
+        );
+        const marca = document.createElement("span");
+        marca.className = "tipo " + paso.tipo;
+        texto(marca, paso.tipo.replace("_", " "));
+        textoPaso.append(marca);
+        fila.append(textoPaso);
+        previsionLista.append(fila);
+      }
+    }
+
+    async function cargarPrevision(codigo) {
+      try {
+        const params = new URLSearchParams({ parada: codigo, minutos: "180" });
+        if (linea.value) params.set("linea", linea.value);
+        const respuesta = await fetch("/api/prevision?" + params.toString());
+        const datos = await respuesta.json();
+        if (!respuesta.ok) {
+          prevision.hidden = false;
+          previsionLista.replaceChildren();
+          const fallo = document.createElement("p");
+          texto(fallo, datos.error || "No hay previsión para esta parada.");
+          previsionLista.append(fallo);
+          return;
+        }
+        pintarPrevision(datos);
+      } catch (err) {
+        prevision.hidden = true;
       }
     }
 

@@ -84,6 +84,7 @@ Preguntas que el agente puede resolver con las herramientas:
 - «En Intercambiador, ¿qué hay de la línea 1 hacia La Trinidad y de la línea 2 hacia La Cuesta?»
 - «¿Va muy lleno el próximo tranvía en Weyler?»
 - «¿Dónde está el vehículo 102?»
+- «¿Cuándo pasa un tranvía por Gracia hacia La Trinidad mañana a las 7:50?»
 - «¿Qué paradas coinciden con “cruz”?»
 
 | Herramienta | Qué devuelve |
@@ -93,6 +94,15 @@ Preguntas que el agente puede resolver con las herramientas:
 | `estado_tranvias` | Posición de los vehículos, próxima parada, orden en la línea y ocupación, si el dato es reciente. El número de vehículo queda vacío cuando la fila es vieja. |
 | `info_vehiculo` | Consulta por el número pintado. Devuelve servicio, línea, sentido, destino, coordenadas, próxima parada, minutos y ocupación. Si no circula o la fila es antigua, lo dice y no rellena el estado. |
 | `info_lineas` | Líneas, sentidos y paradas en orden de marcha. |
+| `prevision_tranvias` | Pasos teóricos por una parada y un sentido entre dos horas. Cada paso es `previsto`, y si la consulta cae en la próxima media hora también puede ser `en_vivo` o `estimado`. No es el horario oficial. |
+
+## Previsión
+
+La tabla de frecuencias de 2026 está en `src/metrotenerife/data/frecuencias_2026.json`. Sale de la página pública [Recorridos y horarios](https://metrotenerife.com/recorridos-y-horarios/), leída el 22 de noviembre de 2026. El tiempo hasta la parada se suma con los minutos entre paradas del catálogo.
+
+Es una aproximación. Cada franja reparte salidas uniformes desde su hora de inicio; no copia el PDF de paso por parada. Las temporadas siguen el párrafo de esa página etiquetado 2026, que no coincide del todo con las fechas de la cabecera de la tabla. Los festivos locales, como el Carnaval, no están en la lista. No lo uses como horario en el que fiarte.
+
+En la demo, «Próximas horas» enseña las tres horas siguientes de la parada elegida. En Home Assistant, el sensor del próximo tranvía lleva un atributo `forecast` con hasta ocho pasos.
 
 ## Home Assistant
 
@@ -108,7 +118,7 @@ Una sola entrada de configuración, con el intervalo de sondeo (mínimo 60 segun
 
 | Sensor | Valor |
 | --- | --- |
-| Próximo tranvía | Hora del primero. Atributos: minutos, destino, línea, servicio, número de vehículo, ocupación y, si el servicio está localizado, su posición. |
+| Próximo tranvía | Hora del primero. Atributos: minutos, destino, línea, servicio, número de vehículo, ocupación, posición si existe, y `forecast` con pasos previstos. |
 | Segundo tranvía | La otra llegada que anuncia el panel para ese mismo sentido. |
 | Tercer tranvía | Solo si hay una estimación fiable. Si no, queda en desconocido. El atributo `origin` vale `estimado`. |
 | Minutos | Minutos hasta el primero. |

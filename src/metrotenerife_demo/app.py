@@ -13,6 +13,7 @@ from metrotenerife.models import Stop
 from metrotenerife.operators import TranviaOperator
 from metrotenerife.present import (
     ambiguous_payload,
+    forecast_payload,
     proximos_payload,
     stop_payload,
     vehicle_query_payload,
@@ -34,6 +35,7 @@ def create_app(**client_kwargs: object) -> web.Application:
     app.router.add_get("/api/paradas", _stops)
     app.router.add_get("/api/llegadas", _arrivals)
     app.router.add_get("/api/vehiculo", _vehicle)
+    app.router.add_get("/api/prevision", _forecast)
     return app
 
 
@@ -93,6 +95,53 @@ async def _arrivals(request: web.Request) -> web.Response:
             destination=None,
             per_direction=3,
             notes=notes,
+        )
+    )
+
+
+async def _forecast(request: web.Request) -> web.Response:
+    stop_query = request.query.get("parada", "").strip()
+    if not stop_query:
+        return _error("Indica una parada.", 400)
+    try:
+        line = _optional_choice(request.query.get("linea"), (1, 2), "La línea tiene que ser 1 o 2.")
+        direction = _optional_choice(
+            request.query.get("sentido"), (1, 2), "El sentido tiene que ser 1 o 2."
+        )
+    except ValueError as err:
+        return _error(str(err), 400)
+    minutos = request.query.get("minutos")
+    parsed_minutes = int(minutos) if minutos and minutos.strip().isdigit() else None
+    if minutos and parsed_minutes is None:
+        return _error("minutos tiene que ser un entero.", 400)
+    operator = request.app[_OPERATOR]
+    try:
+        stop, passages, start, end, mixed, note = await operator.forecast(
+            stop_query,
+            desde=request.query.get("desde"),
+            hasta=request.query.get("hasta"),
+            minutos=parsed_minutes,
+            line=line,
+            direction=direction,
+        )
+    except AmbiguousStopError as err:
+        matches = [match for match in err.matches if isinstance(match, Stop)]
+        return web.json_response(ambiguous_payload(operator.id, stop_query, matches, str(err)))
+    except StopNotFoundError as err:
+        return _error(str(err), 404)
+    except ValueError as err:
+        return _error(str(err), 400)
+    except MetrotenerifeError as err:
+        return _error(str(err), 502)
+    return web.json_response(
+        forecast_payload(
+            operator_id=operator.id,
+            stop=stop,
+            passages=passages,
+            start=start,
+            end=end,
+            mixed=mixed,
+            note=note,
         )
     )
 

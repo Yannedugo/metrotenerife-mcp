@@ -19,6 +19,15 @@ from metrotenerife.errors import (
     StopNotFoundError,
 )
 from metrotenerife.estimate import limit_per_direction
+from metrotenerife.forecast import (
+    AVISO_PREVISTO,
+    Passage,
+    load_schedule,
+    merge_live,
+    resolve_window,
+    theoretical_passages,
+    wants_live,
+)
 from metrotenerife.models import Arrival, Line, Stop, Vehicle, VehiclePosition, VehicleSnapshot
 from metrotenerife.text import fold
 
@@ -149,6 +158,42 @@ class TranviaOperator:
             now=fetched_at,
         )
         return resolved, board, fetched_at, notes
+
+    async def forecast(
+        self,
+        stop: str,
+        *,
+        desde: str | None = None,
+        hasta: str | None = None,
+        minutos: int | None = None,
+        line: int | None = None,
+        direction: int | None = None,
+    ) -> tuple[Stop, list[Passage], datetime, datetime, bool, str]:
+        """Pasos previstos y, si la hora está cerca, los que salen de la fuente."""
+        resolved = self.resolve_stop(stop)
+        now = self._client.now()
+        start, end = resolve_window(now=now, desde=desde, hasta=hasta, minutos=minutos)
+        passages = theoretical_passages(
+            self.catalog,
+            resolved.code,
+            start=start,
+            end=end,
+            line=line,
+            direction=direction,
+            schedule=load_schedule(),
+        )
+        mixed = False
+        note = AVISO_PREVISTO
+        if wants_live(start, end, now):
+            try:
+                _same, arrivals, _fetched, _notes = await self.arrivals(
+                    resolved.code, line=line, direction=direction, per_direction=6
+                )
+                passages = merge_live(passages, arrivals, start=start, end=end)
+                mixed = True
+            except MetrotenerifeError:
+                note += " No se pudo leer TranvíaOnline; solo hay pasos previstos."
+        return resolved, passages, start, end, mixed, note
 
     async def describe_vehicle(self, number: int) -> VehicleQuery:
         """Estado de un tranvía por el número pintado en la unidad.

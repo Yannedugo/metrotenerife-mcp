@@ -37,6 +37,10 @@ El catálogo de paradas, coordenadas, orden de marcha y minutos entre paradas co
 
 La atribución también viaja dentro de `src/metrotenerife/data/catalog.json`.
 
+## Previsión teórica
+
+Las frecuencias de 2026 se transcribieron de la página pública de recorridos y horarios de Metrotenerife. Sirven para calcular un paso aproximado, marcado como previsto. No son el horario de paso por parada ni una autorización para redistribuir un feed horario.
+
 ## Licencia del código
 
 El código de este repositorio se distribuye bajo la licencia MIT (archivo [LICENSE](LICENSE)), copyright 2026 Yann Favier (Yannedugo). Esa licencia cubre el código. No cubre los datos de terceros, las marcas ni el feed en vivo.

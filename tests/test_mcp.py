@@ -27,6 +27,7 @@ async def test_tools_against_a_local_fake(api) -> None:
             "estado_tranvias",
             "info_vehiculo",
             "info_lineas",
+            "prevision_tranvias",
         }
 
         found = json.loads(
@@ -84,6 +85,31 @@ async def test_tools_against_a_local_fake(api) -> None:
         assert old_vehicle["servicio"] is None
         unknown_vehicle = await client.call_tool("info_vehiculo", {"numero": 0})
         assert unknown_vehicle.is_error
+
+        forecast = json.loads(
+            (
+                await client.call_tool(
+                    "prevision_tranvias",
+                    {
+                        "parada": "Gracia",
+                        "sentido": 1,
+                        "desde": "2026-11-23T07:50:00",
+                        "minutos": 20,
+                    },
+                )
+            )
+            .content[0]
+            .text
+        )
+        assert forecast["mezclado_con_en_vivo"] is False
+        assert [item["hora"][11:16] for item in forecast["pasos"]] == [
+            "07:50",
+            "07:55",
+            "08:00",
+            "08:05",
+        ]
+        assert forecast["pasos"][0]["tipo"] == "previsto"
+        assert forecast["pasos"][0]["destino"] == "La Trinidad"
 
         info = json.loads((await client.call_tool("info_lineas", {})).content[0].text)
         assert [line["linea"] for line in info["lineas"]] == [1, 2]
