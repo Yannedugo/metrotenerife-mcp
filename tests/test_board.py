@@ -10,6 +10,7 @@ from metrotenerife.client import parse_arrivals, parse_vehicles
 from metrotenerife.estimate import limit_per_direction
 from metrotenerife.models import Vehicle
 from metrotenerife.occupancy import normalize_carga, occupancy_texts
+from metrotenerife.operators import compose_board
 
 NOW = datetime(2026, 11, 22, 14, 7, tzinfo=UTC)
 
@@ -167,6 +168,7 @@ def test_third_tram_is_estimated_from_an_upstream_vehicle(fixture) -> None:
         next_stop_name="Intercambiador",
         destination_code="TRI",
         destination_name="La Trinidad",
+        vehicle_id=77,
     )
     already_passed = Vehicle(
         service="502",
@@ -203,7 +205,19 @@ def test_third_tram_is_estimated_from_an_upstream_vehicle(fixture) -> None:
     assert board[2].estimated is True
     assert board[2].origin == "estimado"
     assert board[2].minutes == 20
+    assert board[2].vehicle_id == 77
     assert notes == []
+    composed, _composed_notes = compose_board(
+        official,
+        [upstream, already_passed, turning],
+        catalog,
+        per_direction=3,
+        now=NOW,
+    )
+    assert composed[2].position is not None
+    assert composed[2].position.next_stop_code == "INT"
+    assert composed[2].position.lat == 28.45
+    assert composed[0].position is None
 
     only_official, missing = limit_per_direction(
         official, [already_passed, turning], catalog, per_direction=3, now=NOW

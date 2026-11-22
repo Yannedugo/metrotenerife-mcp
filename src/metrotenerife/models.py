@@ -79,6 +79,18 @@ class Line:
 
 
 @dataclass(frozen=True, slots=True)
+class VehiclePosition:
+    """Dónde está ahora el servicio, si vehicleLocation lo trae en esta consulta."""
+
+    lat: float
+    lon: float
+    next_stop_code: str
+    next_stop_name: str
+    minutes_to_next: int
+    order: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Arrival:
     """Un tranvía anunciado en una parada."""
 
@@ -102,6 +114,7 @@ class Arrival:
     occupancy_discarded: bool = False
     estimated: bool = False
     origin: str = "tranviaonline"
+    position: VehiclePosition | None = None
 
     @property
     def estimated_arrival(self) -> datetime:
@@ -133,6 +146,16 @@ class Arrival:
             ),
             "vehicle_id": self.vehicle_id,
             "occupancy_discarded": self.occupancy_discarded,
+            "position": None
+            if self.position is None
+            else {
+                "lat": self.position.lat,
+                "lon": self.position.lon,
+                "next_stop_code": self.position.next_stop_code,
+                "next_stop_name": self.position.next_stop_name,
+                "minutes_to_next": self.position.minutes_to_next,
+                "order": self.position.order,
+            },
         }
 
 
@@ -167,6 +190,7 @@ class Vehicle:
     vehicle_id: int | None = None
     occupancy_updated_at: datetime | None = None
     occupancy_discarded: bool = False
+    location_vehicle_id: int | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -185,6 +209,7 @@ class Vehicle:
             "occupancy_raw": self.occupancy_raw,
             "occupancy_high": self.occupancy_high,
             "vehicle_id": self.vehicle_id,
+            "location_vehicle_id": self.location_vehicle_id,
             "occupancy_updated_at": (
                 self.occupancy_updated_at.isoformat() if self.occupancy_updated_at else None
             ),

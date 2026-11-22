@@ -11,7 +11,12 @@ from metrotenerife.client import TranviaOnlineClient
 from metrotenerife.errors import AmbiguousStopError, MetrotenerifeError, StopNotFoundError
 from metrotenerife.models import Stop
 from metrotenerife.operators import TranviaOperator
-from metrotenerife.present import ambiguous_payload, proximos_payload, stop_payload
+from metrotenerife.present import (
+    ambiguous_payload,
+    proximos_payload,
+    stop_payload,
+    vehicle_query_payload,
+)
 
 _INDEX = Path(__file__).resolve().parent / "index.html"
 _CLIENT_KW: web.AppKey[dict[str, object]] = web.AppKey("client_kwargs", dict)
@@ -28,6 +33,7 @@ def create_app(**client_kwargs: object) -> web.Application:
     app.router.add_get("/", _index)
     app.router.add_get("/api/paradas", _stops)
     app.router.add_get("/api/llegadas", _arrivals)
+    app.router.add_get("/api/vehiculo", _vehicle)
     return app
 
 
@@ -89,6 +95,18 @@ async def _arrivals(request: web.Request) -> web.Response:
             notes=notes,
         )
     )
+
+
+async def _vehicle(request: web.Request) -> web.Response:
+    raw = request.query.get("numero", "").strip()
+    if not raw.isdigit() or int(raw) < 1:
+        return _error("Indica el número pintado en el tranvía, un entero positivo.", 400)
+    operator = request.app[_OPERATOR]
+    try:
+        report = await operator.describe_vehicle(int(raw))
+    except MetrotenerifeError as err:
+        return _error(str(err), 502)
+    return web.json_response(vehicle_query_payload(report))
 
 
 def _optional_choice(raw: str | None, allowed: tuple[int, ...], message: str) -> int | None:

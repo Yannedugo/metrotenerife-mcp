@@ -9,9 +9,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from metrotenerife.models import Arrival, Stop, direction_label
+from metrotenerife.models import Arrival, Stop, Vehicle, VehiclePosition, direction_label
 from metrotenerife.occupancy import OCCUPANCY_MEANING, occupancy_texts
-from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO
+from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, VehicleQuery
 
 
 def stop_payload(stop: Stop) -> dict[str, Any]:
@@ -37,6 +37,9 @@ def arrival_payload(arrival: Arrival) -> dict[str, Any]:
         "llegando": arrival.minutes == 0,
         "llegada_estimada": arrival.estimated_arrival.isoformat(),
         "servicio": arrival.service,
+        "vehiculo": arrival.vehicle_id,
+        "orden_parada": arrival.order,
+        "posicion": position_payload(arrival.position),
         "actualizado": arrival.updated_at.isoformat(),
         "aproximado": arrival.approximate,
         "estimado": arrival.estimated,
@@ -50,6 +53,82 @@ def arrival_payload(arrival: Arrival) -> dict[str, Any]:
         "ocupacion_actualizada": (
             arrival.occupancy_updated_at.isoformat() if arrival.occupancy_updated_at else None
         ),
+        "ocupacion_significado": OCCUPANCY_MEANING,
+    }
+
+
+def position_payload(position: VehiclePosition | None) -> dict[str, Any] | None:
+    if position is None:
+        return None
+    return {
+        "lat": position.lat,
+        "lon": position.lon,
+        "proxima_parada": position.next_stop_name,
+        "proxima_parada_codigo": position.next_stop_code,
+        "minutos_proxima_parada": position.minutes_to_next,
+        "orden": position.order,
+    }
+
+
+def vehicle_state_payload(vehicle: Vehicle) -> dict[str, Any]:
+    """Posición en vivo. El número de vehículo es null si no hay fila reciente."""
+    updated = vehicle.occupancy_updated_at
+    return {
+        "servicio": vehicle.service,
+        "vehiculo": vehicle.vehicle_id,
+        "linea": vehicle.line,
+        "sentido": vehicle.direction,
+        "sentido_etiqueta": direction_label(vehicle.line, vehicle.direction),
+        "destino": vehicle.destination_name,
+        "destino_codigo": vehicle.destination_code,
+        "proxima_parada": vehicle.next_stop_name,
+        "proxima_parada_codigo": vehicle.next_stop_code,
+        "minutos_proxima_parada": vehicle.minutes_to_next,
+        "orden": vehicle.order,
+        "lat": vehicle.lat,
+        "lon": vehicle.lon,
+        "ocupacion_cruda": vehicle.occupancy_raw,
+        "ocupacion_porcentaje": vehicle.occupancy_percent,
+        "ocupacion_muy_alta": vehicle.occupancy_high,
+        "ocupacion_fresca": vehicle.occupancy_percent is not None,
+        "ocupacion_actualizada": updated.isoformat() if updated else None,
+        "ocupacion_descartada": vehicle.occupancy_discarded,
+        "ocupacion_significado": OCCUPANCY_MEANING,
+    }
+
+
+def vehicle_query_payload(query: VehicleQuery) -> dict[str, Any]:
+    """Lo que devuelve `info_vehiculo` y el buscador de la demo."""
+    vehicle = query.vehicle
+    return {
+        "aviso": AVISO_EN_VIVO,
+        "numero": query.number,
+        "estado": query.state,
+        "mensaje": query.message,
+        "obtenido_a": query.fetched_at.isoformat(),
+        "ocupacion_disponible": query.occupancy_available,
+        "posicion_disponible": query.position_available,
+        "servicio": query.service,
+        "vehiculo": query.number if query.state in {"en_servicio", "sin_posicion"} else None,
+        "linea": vehicle.line if vehicle else None,
+        "sentido": vehicle.direction if vehicle else None,
+        "sentido_etiqueta": (direction_label(vehicle.line, vehicle.direction) if vehicle else None),
+        "destino": vehicle.destination_name if vehicle else None,
+        "destino_codigo": vehicle.destination_code if vehicle else None,
+        "lat": vehicle.lat if vehicle else None,
+        "lon": vehicle.lon if vehicle else None,
+        "proxima_parada": vehicle.next_stop_name if vehicle else None,
+        "proxima_parada_codigo": vehicle.next_stop_code if vehicle else None,
+        "minutos_proxima_parada": vehicle.minutes_to_next if vehicle else None,
+        "orden": vehicle.order if vehicle else None,
+        "ocupacion_cruda": query.occupancy_raw if query.occupancy_fresh else None,
+        "ocupacion_porcentaje": query.occupancy_percent if query.occupancy_fresh else None,
+        "ocupacion_muy_alta": query.occupancy_high if query.occupancy_fresh else False,
+        "ocupacion_fresca": query.occupancy_fresh,
+        "ocupacion_actualizada": (
+            query.occupancy_updated_at.isoformat() if query.occupancy_updated_at else None
+        ),
+        "fila_antigua": (query.stale_updated_at.isoformat() if query.stale_updated_at else None),
         "ocupacion_significado": OCCUPANCY_MEANING,
     }
 

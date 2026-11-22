@@ -106,6 +106,11 @@
       padding: 0 0.35rem;
     }
     .aviso-ocupacion { color: #b42318; margin: 0.2rem 0 0; }
+    .detalle { margin: 0 0 0.6rem; color: var(--suave); }
+    .detalle summary { cursor: pointer; }
+    .detalle ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+    .ficha { margin-top: 0.8rem; }
+    .servicio { font-weight: 650; }
     .llegando { color: var(--verde); }
     h2 { font-size: 1.05rem; margin: 0 0 0.2rem; }
     pre {
@@ -139,11 +144,16 @@
           <option value="2">Línea 2</option>
         </select>
       </label>
+      <label>Número de vehículo
+        <input id="vehiculo" inputmode="numeric" placeholder="El número pintado en el tranvía, por ejemplo 102" autocomplete="off">
+      </label>
       <div class="acciones">
+        <button type="button" id="buscar-vehiculo">Buscar vehículo</button>
         <button type="button" id="refrescar">Actualizar ahora</button>
         <a class="boton secundario" id="oficial" href="https://tranviaonline.metrotenerife.com/" target="_blank" rel="noopener">Ver en TranvíaOnline</a>
       </div>
       <p class="meta" id="reloj">Se actualiza sola cada 60 segundos.</p>
+      <div id="ficha"></div>
     </form>
 
     <p class="error" id="error" hidden></p>
@@ -161,6 +171,9 @@
     const REFRESH_MS = 60000;
     const buscar = document.getElementById("buscar");
     const parada = document.getElementById("parada");
+    const vehiculo = document.getElementById("vehiculo");
+    const buscarVehiculo = document.getElementById("buscar-vehiculo");
+    const ficha = document.getElementById("ficha");
     const linea = document.getElementById("linea");
     const refrescar = document.getElementById("refrescar");
     const oficial = document.getElementById("oficial");
@@ -273,7 +286,9 @@
           const fila = document.createElement("div");
           fila.className = "fila";
           const servicio = document.createElement("span");
-          texto(servicio, "Servicio " + llegada.servicio);
+          servicio.className = "servicio";
+          const numero = llegada.vehiculo == null ? "desconocido" : String(llegada.vehiculo);
+          texto(servicio, "Vehículo " + numero + " · Servicio " + llegada.servicio);
           if (llegada.estimado) {
             const marca = document.createElement("span");
             marca.className = "estimado";
@@ -308,6 +323,7 @@
             texto(avisoOcupacion, llegada.ocupacion_aviso);
             bloque.append(avisoOcupacion);
           }
+          bloque.append(detalleLlegada(llegada));
         }
         if (grupo.length < 3) {
           const hueco = document.createElement("p");
@@ -360,7 +376,97 @@
       programar();
     }
 
+    function detalleLlegada(llegada) {
+      const det = document.createElement("details");
+      det.className = "detalle";
+      const sumario = document.createElement("summary");
+      texto(sumario, "Detalle");
+      const puntos = document.createElement("ul");
+      const filas = [];
+      if (llegada.orden_parada != null) {
+        filas.push("Orden de esta parada en la línea: " + llegada.orden_parada);
+      }
+      const posicion = llegada.posicion;
+      if (posicion) {
+        filas.push(
+          "Próxima parada del tranvía: " + posicion.proxima_parada
+          + " (" + posicion.minutos_proxima_parada + " min)"
+        );
+        filas.push("Posición: " + posicion.lat + ", " + posicion.lon);
+        if (posicion.orden != null) filas.push("Orden del vehículo en la línea: " + posicion.orden);
+      } else {
+        filas.push("Sin posición en vivo para este servicio.");
+      }
+      filas.push(llegada.estimado
+        ? "Esta llegada es estimada: el panel no la anuncia."
+        : "Esta llegada la anuncia el panel.");
+      for (const fila of filas) {
+        const item = document.createElement("li");
+        texto(item, fila);
+        puntos.append(item);
+      }
+      det.append(sumario, puntos);
+      return det;
+    }
+
+    function pintarVehiculo(datos) {
+      ficha.replaceChildren();
+      const caja = document.createElement("section");
+      caja.className = "ficha";
+      const titulo = document.createElement("h2");
+      texto(titulo, "Vehículo " + datos.numero);
+      const mensaje = document.createElement("p");
+      texto(mensaje, datos.mensaje || "");
+      caja.append(titulo, mensaje);
+      if (datos.estado === "en_servicio") {
+        const lista = document.createElement("ul");
+        const filas = [
+          "Servicio " + datos.servicio,
+          "Línea " + datos.linea + " · " + (datos.sentido_etiqueta || ""),
+          "Destino " + (datos.destino || "desconocido"),
+          "Próxima parada: " + datos.proxima_parada + " (" + datos.minutos_proxima_parada + " min)",
+          "Posición: " + datos.lat + ", " + datos.lon
+        ];
+        if (datos.orden != null) filas.push("Orden en la línea: " + datos.orden);
+        filas.push(datos.ocupacion_fresca
+          ? "Ocupación reciente: " + datos.ocupacion_porcentaje + " %"
+          : "Ocupación desconocida: la fila no es reciente.");
+        for (const fila of filas) {
+          const item = document.createElement("li");
+          texto(item, fila);
+          lista.append(item);
+        }
+        caja.append(lista);
+      }
+      ficha.append(caja);
+    }
+
+    async function consultarVehiculo() {
+      const numero = vehiculo.value.trim();
+      if (!/^[1-9][0-9]*$/.test(numero)) {
+        mostrarError("Escribe el número pintado en el tranvía.");
+        return;
+      }
+      mostrarError("");
+      buscarVehiculo.disabled = true;
+      try {
+        const respuesta = await fetch("/api/vehiculo?numero=" + encodeURIComponent(numero));
+        const datos = await respuesta.json();
+        if (!respuesta.ok) {
+          ficha.replaceChildren();
+          mostrarError(datos.error || "No se pudo consultar el vehículo.");
+          return;
+        }
+        pintarVehiculo(datos);
+      } catch (err) {
+        mostrarError("No hay conexión con la página local.");
+      } finally {
+        buscarVehiculo.disabled = false;
+      }
+    }
+
     buscar.addEventListener("input", pintarParadas);
+    buscarVehiculo.addEventListener("click", consultarVehiculo);
     parada.addEventListener("change", () => { cargar(); programar(); });
     linea.addEventListener("change", () => { cargar(); programar(); });
     refrescar.addEventListener("click", () => { cargar(); programar(); });

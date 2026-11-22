@@ -24,6 +24,9 @@ async def test_index_is_a_local_spanish_page(api) -> None:
     assert response.status == 200
     assert "Tranvía de Tenerife" in html
     assert "Actualizar ahora" in html
+    assert "Buscar vehículo" in html
+    assert "Vehículo " in html
+    assert "Detalle" in html
     assert "60000" in html
     assert "tranviaonline.metrotenerife.com/#paneles/" in html
     assert "cdn" not in html.lower()
@@ -65,6 +68,14 @@ async def test_arrivals_match_the_agent_payload_and_use_the_cache(api) -> None:
     assert body["llegadas"][1]["ocupacion_fresca"] is False
     assert "porcentaje" in body["llegadas"][0]["ocupacion_significado"].lower()
     assert body["llegadas"][0]["sentido_etiqueta"] == "Hacia La Trinidad"
+    assert body["llegadas"][0]["servicio"] == "405"
+    assert body["llegadas"][0]["vehiculo"] == 102
+    assert body["llegadas"][0]["orden_parada"] == 1
+    assert body["llegadas"][0]["posicion"]["proxima_parada"] == "Fundación"
+    assert body["llegadas"][0]["posicion"]["lat"] == 28.4595
+    assert body["llegadas"][0]["posicion"]["orden"] == 2
+    assert body["llegadas"][1]["vehiculo"] is None
+    assert body["llegadas"][1]["posicion"] is None
     assert filtered["filtros"]["linea"] == 1
     assert api["hits"].count("INT") == 1
 
@@ -82,6 +93,36 @@ async def test_arrivals_reject_a_missing_or_unknown_stop(api) -> None:
     assert ambiguous.status == 200
     assert ambiguous_body["ambiguo"] is True
     assert {stop["codigo"] for stop in ambiguous_body["paradas"]} == {"CAN", "HOS"}
+
+
+async def test_vehicle_lookup_uses_fresh_rows_and_says_when_the_row_is_old(api) -> None:
+    app = create_app(
+        base_url=api["base_url"], min_interval=0, cache_ttl=30, max_retries=0, clock=lambda: FROZEN
+    )
+    async with TestClient(TestServer(app)) as http:
+        live = await (await http.get("/api/vehiculo", params={"numero": "102"})).json()
+        stale = await (await http.get("/api/vehiculo", params={"numero": "88"})).json()
+        missing = await (await http.get("/api/vehiculo", params={"numero": "12345"})).json()
+        invalid = await http.get("/api/vehiculo", params={"numero": "0"})
+    assert live["estado"] == "en_servicio"
+    assert live["servicio"] == "405"
+    assert live["destino"] == "La Trinidad"
+    assert live["proxima_parada"] == "Fundación"
+    assert live["minutos_proxima_parada"] == 3
+    assert live["lat"] == 28.4595
+    assert live["ocupacion_fresca"] is True
+    assert live["ocupacion_porcentaje"] == 33
+    assert live["ocupacion_cruda"] == 28
+    assert "circula ahora" in live["mensaje"]
+    assert stale["estado"] == "dato_antiguo"
+    assert stale["servicio"] is None
+    assert stale["vehiculo"] is None
+    assert stale["lat"] is None
+    assert "no se usa" in stale["mensaje"].lower()
+    assert missing["estado"] == "desconocido"
+    assert missing["servicio"] is None
+    assert "no está en la fuente" in missing["mensaje"]
+    assert invalid.status == 400
 
 
 def test_debug_flag_enables_library_logs() -> None:

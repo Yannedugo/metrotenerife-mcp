@@ -201,8 +201,32 @@ def test_occupancy_drops_stale_rows(fixture) -> None:
     assert merged["405"].occupancy_raw == 28
     assert merged["405"].occupancy_percent == 33
     assert merged["405"].occupancy_high is False
+    assert merged["405"].vehicle_id == 102
     assert merged["409"].occupancy_percent is None
     assert merged["409"].occupancy_discarded is True
+    assert merged["409"].vehicle_id is None
+
+
+def test_location_vehicle_number_is_kept_when_occupancy_is_stale() -> None:
+    vehicle = parse_vehicles(
+        [
+            {
+                "service": "409",
+                "coordinate": {"lat": 28.4, "lon": -16.3},
+                "route": 2,
+                "direction": 2,
+                "remainingMinutes": 1,
+                "nextStop": "JER",
+                "destinationStop": "TIN",
+                "VEHICULO": 88,
+            }
+        ]
+    )[0]
+    merged = merge_occupancy(vehicle, {}, {"409"})
+    assert merged.location_vehicle_id == 88
+    assert merged.vehicle_id == 88
+    assert merged.occupancy_raw is None
+    assert merged.occupancy_discarded is True
 
 
 async def test_vehicles_keep_positions_if_occupancy_fails(api, monkeypatch) -> None:

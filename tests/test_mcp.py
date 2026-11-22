@@ -25,6 +25,7 @@ async def test_tools_against_a_local_fake(api) -> None:
             "buscar_parada",
             "proximos_tranvias",
             "estado_tranvias",
+            "info_vehiculo",
             "info_lineas",
         }
 
@@ -46,6 +47,8 @@ async def test_tools_against_a_local_fake(api) -> None:
         assert live["llegadas"][0]["ocupacion_cruda"] == 28
         assert live["llegadas"][0]["ocupacion_porcentaje"] == 33
         assert live["llegadas"][0]["ocupacion_fresca"] is True
+        assert live["llegadas"][0]["vehiculo"] == 102
+        assert live["llegadas"][0]["posicion"]["proxima_parada_codigo"] == "FUN"
         assert live["parada"]["codigo"] == "INT"
 
         ambiguous = json.loads(
@@ -65,6 +68,22 @@ async def test_tools_against_a_local_fake(api) -> None:
         assert state["tranvias"][0]["lat"] == 28.448912
         assert state["tranvias"][0]["ocupacion_fresca"] is False
         assert state["tranvias"][0]["ocupacion_porcentaje"] is None
+        assert state["tranvias"][0]["vehiculo"] is None
+        assert state["tranvias"][0]["orden"] == 5
+
+        found_vehicle = json.loads(
+            (await client.call_tool("info_vehiculo", {"numero": 102})).content[0].text
+        )
+        assert found_vehicle["estado"] == "en_servicio"
+        assert found_vehicle["servicio"] == "405"
+        assert found_vehicle["ocupacion_fresca"] is True
+        old_vehicle = json.loads(
+            (await client.call_tool("info_vehiculo", {"numero": 88})).content[0].text
+        )
+        assert old_vehicle["estado"] == "dato_antiguo"
+        assert old_vehicle["servicio"] is None
+        unknown_vehicle = await client.call_tool("info_vehiculo", {"numero": 0})
+        assert unknown_vehicle.is_error
 
         info = json.loads((await client.call_tool("info_lineas", {})).content[0].text)
         assert [line["linea"] for line in info["lineas"]] == [1, 2]

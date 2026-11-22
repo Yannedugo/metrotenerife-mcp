@@ -14,7 +14,7 @@ import random
 import re
 import ssl
 from collections.abc import Awaitable, Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -34,6 +34,10 @@ from metrotenerife.models import Arrival, Occupancy, Vehicle, VehicleSnapshot
 from metrotenerife.occupancy import HIGH_CARGA, normalize_carga
 
 logger = logging.getLogger(__name__)
+
+# Claves con las que la fuente puede nombrar el número pintado en el tranvía.
+# `service` no es ese número: es el servicio de la marcha.
+_VEHICLE_ID_KEYS = ("VEHICULO", "vehiculo", "vehicleId", "numeroVehiculo")
 
 USER_AGENT = (
     "metrotenerife/0.1.0 (+https://github.com/Yannedugo/metrotenerife-mcp; "
@@ -179,14 +183,22 @@ class TranviaOnlineClient:
         fresh, stale, _available = await self._occupancy_index(self._clock())
         return [attach_occupancy(arrival, fresh, stale) for arrival in arrivals]
 
-    async def _occupancy_index(self, now: datetime) -> tuple[dict[str, Occupancy], set[str], bool]:
-        """Ocupación fresca, servicios con dato viejo y si el endpoint respondió."""
+    async def occupancy_index(self, now: datetime | None = None) -> tuple[OccupancyIndex, bool]:
+        """Filas recientes y filas viejas. El booleano dice si el endpoint respondió."""
+        moment = now or self._clock()
         try:
             payload = await self._get_json("/api/cargaVehiculo")
         except (HttpStatusError, RequestTimeoutError, TransportError, ParseError):
             logger.warning("No se pudo leer la ocupación; se deja como desconocida")
+            return OccupancyIndex(fresh={}, stale=()), False
+        return classify_occupancy(payload, now=moment, max_age=self._occupancy_max_age), True
+
+    async def _occupancy_index(self, now: datetime) -> tuple[dict[str, Occupancy], set[str], bool]:
+        """Ocupación fresca, servicios con dato viejo y si el endpoint respondió."""
+        index, available = await self.occupancy_index(now)
+        if not available:
             return {}, set(), False
-        fresh, stale = parse_occupancy(payload, now=now, max_age=self._occupancy_max_age)
+        fresh, stale = index.fresh, {item.service for item in index.stale}
         return fresh, stale, True
 
     async def _get_json(self, path: str) -> Any:
@@ -303,40 +315,63 @@ def parse_vehicles(payload: Any) -> list[Vehicle]:
     return vehicles
 
 
-def parse_occupancy(
-    payload: Any, *, now: datetime, max_age: timedelta
-) -> tuple[dict[str, Occupancy], set[str]]:
-    """Separa ocupación reciente de servicios con fecha vieja.
+@dataclass(frozen=True, slots=True)
+class OccupancyIndex:
+    """Ocupación separada por frescura. La vieja no se usa como estado actual."""
+
+    fresh: dict[str, Occupancy]
+    stale: tuple[Occupancy, ...]
+
+
+def classify_occupancy(payload: Any, *, now: datetime, max_age: timedelta) -> OccupancyIndex:
+    """Separa filas recientes de filas viejas, ambas indexables por servicio.
 
     TranvíaOnline deja filas de servicios que ya no circulan. Esas filas no se
-    asocian a una unidad.
+    asocian a una unidad. Si un servicio se repite, se queda la fecha más nueva.
     """
-    items = _as_dicts(payload)
     fresh: dict[str, Occupancy] = {}
-    stale: set[str] = set()
-    for item in items:
+    stale_by_service: dict[str, Occupancy] = {}
+    for item in _as_dicts(payload):
         parsed = _parse_occupancy_item(item)
         if parsed is None:
             continue
-        if now - parsed.updated_at > max_age or parsed.updated_at - now > timedelta(minutes=5):
-            stale.add(parsed.service)
+        if _is_stale(parsed.updated_at, now, max_age):
+            current = stale_by_service.get(parsed.service)
+            if current is None or parsed.updated_at >= current.updated_at:
+                stale_by_service[parsed.service] = parsed
             continue
         current = fresh.get(parsed.service)
         if current is None or parsed.updated_at >= current.updated_at:
             fresh[parsed.service] = parsed
-    return fresh, stale
+    return OccupancyIndex(fresh=fresh, stale=tuple(stale_by_service.values()))
+
+
+def parse_occupancy(
+    payload: Any, *, now: datetime, max_age: timedelta
+) -> tuple[dict[str, Occupancy], set[str]]:
+    """Ocupación reciente por servicio y servicios cuya fila se ha descartado."""
+    index = classify_occupancy(payload, now=now, max_age=max_age)
+    return index.fresh, {item.service for item in index.stale}
 
 
 def attach_occupancy(arrival: Arrival, fresh: dict[str, Occupancy], stale: set[str]) -> Arrival:
-    """Une la ocupación por número de servicio. Lo viejo o ausente queda desconocido."""
+    """Une ocupación y número de vehículo por servicio.
+
+    El número pintado sale de una fila reciente. Si la fila es vieja o no
+    existe, no se inventa: solo se conserva un número que ya trajera esta
+    misma fila del panel.
+    """
+    reported = arrival.vehicle_id
     occupancy = fresh.get(arrival.service)
     if occupancy is None:
         return replace(
             arrival,
             occupancy_percent=None,
+            occupancy_raw=None,
             occupancy_fresh=False,
+            occupancy_high=False,
             occupancy_updated_at=None,
-            vehicle_id=None,
+            vehicle_id=reported,
             occupancy_discarded=arrival.service in stale,
         )
     return replace(
@@ -346,31 +381,35 @@ def attach_occupancy(arrival: Arrival, fresh: dict[str, Occupancy], stale: set[s
         occupancy_high=occupancy.raw >= HIGH_CARGA,
         occupancy_fresh=True,
         occupancy_updated_at=occupancy.updated_at,
-        vehicle_id=occupancy.vehicle_id,
+        vehicle_id=occupancy.vehicle_id if occupancy.vehicle_id is not None else reported,
         occupancy_discarded=False,
     )
 
 
 def merge_occupancy(vehicle: Vehicle, fresh: dict[str, Occupancy], stale: set[str]) -> Vehicle:
+    """Añade la ocupación reciente. El número de la fila vieja no se usa.
+
+    Si vehicleLocation trae su propio número, ese sí se conserva: es de la
+    posición que se acaba de leer, no de una fila antigua.
+    """
+    reported = vehicle.location_vehicle_id
     occupancy = fresh.get(vehicle.service)
     if occupancy is None:
-        if vehicle.service not in stale:
-            return vehicle
         return replace(
             vehicle,
             occupancy_percent=None,
             occupancy_raw=None,
             occupancy_high=False,
-            vehicle_id=None,
+            vehicle_id=reported,
             occupancy_updated_at=None,
-            occupancy_discarded=True,
+            occupancy_discarded=vehicle.service in stale,
         )
     return replace(
         vehicle,
         occupancy_raw=occupancy.raw,
         occupancy_percent=normalize_carga(occupancy.raw),
         occupancy_high=occupancy.raw >= HIGH_CARGA,
-        vehicle_id=occupancy.vehicle_id,
+        vehicle_id=occupancy.vehicle_id if occupancy.vehicle_id is not None else reported,
         occupancy_updated_at=occupancy.updated_at,
         occupancy_discarded=False,
     )
@@ -479,6 +518,7 @@ def _parse_arrival(item: dict[str, Any], now: datetime) -> Arrival | None:
         updated_at=updated_at,
         order=int(order) if isinstance(order, int | float | str) and str(order).isdigit() else None,
         approximate=approximate,
+        vehicle_id=_optional_vehicle_id(item),
     )
 
 
@@ -500,6 +540,7 @@ def _parse_vehicle(item: dict[str, Any]) -> Vehicle | None:
     if not service or not next_stop or not destination:
         return None
     order = item.get("orderStop")
+    reported = _optional_vehicle_id(item)
     return Vehicle(
         service=service,
         lat=lat,
@@ -512,6 +553,8 @@ def _parse_vehicle(item: dict[str, Any]) -> Vehicle | None:
         destination_code=destination,
         destination_name=_title(item.get("destinationStopDescription"), destination),
         order=int(order) if isinstance(order, int | float | str) and str(order).isdigit() else None,
+        vehicle_id=reported,
+        location_vehicle_id=reported,
     )
 
 
@@ -524,11 +567,32 @@ def _parse_occupancy_item(item: dict[str, Any]) -> Occupancy | None:
         updated_at = _parse_local(str(item["FECHA"]))
     except (KeyError, TypeError, ValueError):
         return None
-    vehicle = item.get("VEHICULO")
-    vehicle_id = (
-        int(vehicle) if isinstance(vehicle, int | float | str) and str(vehicle).isdigit() else None
+    return Occupancy(
+        service=service,
+        raw=raw,
+        updated_at=updated_at,
+        vehicle_id=_optional_vehicle_id(item),
     )
-    return Occupancy(service=service, raw=raw, updated_at=updated_at, vehicle_id=vehicle_id)
+
+
+def _is_stale(updated_at: datetime, now: datetime, max_age: timedelta) -> bool:
+    return now - updated_at > max_age or updated_at - now > timedelta(minutes=5)
+
+
+def _optional_vehicle_id(item: dict[str, Any]) -> int | None:
+    """Número pintado, si esta fila lo trae. No se deduce del servicio."""
+    for key in _VEHICLE_ID_KEYS:
+        if key not in item or item[key] is None:
+            continue
+        raw = item[key]
+        if isinstance(raw, bool):
+            return None
+        if isinstance(raw, int | float) and float(raw).is_integer() and int(raw) > 0:
+            return int(raw)
+        if isinstance(raw, str) and raw.strip().isdigit() and int(raw.strip()) > 0:
+            return int(raw.strip())
+        return None
+    return None
 
 
 def _timestamp(item: dict[str, Any], now: datetime) -> tuple[datetime, bool]:

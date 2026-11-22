@@ -120,6 +120,14 @@ def _arrival_attribute(arrival: Arrival) -> dict[str, Any]:
         "minutes": arrival.minutes,
         "estimated_arrival": arrival.estimated_arrival.isoformat(),
         "service": arrival.service,
+        "vehicle_id": arrival.vehicle_id,
+        "stop_order": arrival.order,
+        "vehicle_lat": arrival.position.lat if arrival.position else None,
+        "vehicle_lon": arrival.position.lon if arrival.position else None,
+        "vehicle_next_stop": arrival.position.next_stop_name if arrival.position else None,
+        "vehicle_next_stop_code": arrival.position.next_stop_code if arrival.position else None,
+        "vehicle_minutes_to_next": (arrival.position.minutes_to_next if arrival.position else None),
+        "vehicle_order": arrival.position.order if arrival.position else None,
         "updated_at": arrival.updated_at.isoformat(),
         "estimated": arrival.estimated,
         "origin": arrival.origin,
@@ -208,6 +216,13 @@ class NextTramSensor(_StopSensor):
             "destination_code": arrival.destination_code if arrival else None,
             "minutes": arrival.minutes if arrival else None,
             "service": arrival.service if arrival else None,
+            "vehicle_id": arrival.vehicle_id if arrival else None,
+            "stop_order": arrival.order if arrival else None,
+            "vehicle_lat": arrival.position.lat if arrival and arrival.position else None,
+            "vehicle_lon": arrival.position.lon if arrival and arrival.position else None,
+            "vehicle_next_stop": (
+                arrival.position.next_stop_name if arrival and arrival.position else None
+            ),
             "occupancy_raw": arrival.occupancy_raw if arrival and arrival.occupancy_fresh else None,
             "occupancy_percent": (
                 arrival.occupancy_percent if arrival and arrival.occupancy_fresh else None
@@ -288,6 +303,7 @@ class MinutesSensor(_StopSensor):
             "destination": arrival.destination_name,
             "destination_code": arrival.destination_code,
             "service": arrival.service,
+            "vehicle_id": arrival.vehicle_id,
             "arriving": arrival.minutes == 0,
             "estimated_arrival": arrival.estimated_arrival.isoformat(),
             "occupancy_percent": arrival.occupancy_percent if arrival.occupancy_fresh else None,
@@ -335,6 +351,7 @@ class LineNextTramSensor(_StopSensor):
             "direction": first.direction if first else None,
             "minutes": first.minutes if first else None,
             "service": first.service if first else None,
+            "vehicle_id": first.vehicle_id if first else None,
             "occupancy_percent": (
                 first.occupancy_percent if first and first.occupancy_fresh else None
             ),

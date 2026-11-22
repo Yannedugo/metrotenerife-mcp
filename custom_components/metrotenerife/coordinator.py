@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from metrotenerife import Arrival, TranviaOnlineClient, filter_arrivals, load_catalog
 from metrotenerife.errors import MetrotenerifeError
-from metrotenerife.operators import label_arrival
+from metrotenerife.operators import compose_board, label_arrival
 
 from .const import (
     CONF_DIRECTION,
@@ -96,11 +96,25 @@ class TranviaCoordinator(DataUpdateCoordinator[NetworkSnapshot]):
             grouped = await self.client.panels()
         except MetrotenerifeError as err:
             raise UpdateFailed(str(err)) from err
-        labeled = {
-            code: tuple(label_arrival(arrival, self._catalog) for arrival in arrivals)
-            for code, arrivals in grouped.items()
-        }
-        return NetworkSnapshot(fetched_at=datetime.now(UTC), by_stop=labeled)
+        fetched_at = datetime.now(UTC)
+        try:
+            snapshot = await self.client.vehicles()
+            vehicles = list(snapshot.vehicles)
+        except MetrotenerifeError:
+            _LOGGER.warning("No se pudo leer la posición de los tranvías")
+            vehicles = []
+        labeled: dict[str, tuple[Arrival, ...]] = {}
+        for code, arrivals in grouped.items():
+            named = [label_arrival(arrival, self._catalog) for arrival in arrivals]
+            board, _notes = compose_board(
+                named,
+                vehicles,
+                self._catalog,
+                per_direction=3,
+                now=fetched_at,
+            )
+            labeled[code] = tuple(board)
+        return NetworkSnapshot(fetched_at=fetched_at, by_stop=labeled)
 
     async def async_manual_refresh(self) -> None:
         """Refresco manual con una espera mínima para no insistir."""

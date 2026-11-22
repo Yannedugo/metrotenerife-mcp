@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Any
 
 from mcp.server.mcpserver import Context, MCPServer
@@ -25,16 +24,23 @@ from metrotenerife.errors import (
     OperatorNotFoundError,
     StopNotFoundError,
 )
-from metrotenerife.models import Stop, Vehicle, direction_label
-from metrotenerife.occupancy import OCCUPANCY_MEANING
+from metrotenerife.models import Stop, direction_label
 from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, OperatorRegistry, TranviaOperator
-from metrotenerife.present import ambiguous_payload, proximos_payload, stop_payload
+from metrotenerife.present import (
+    ambiguous_payload,
+    proximos_payload,
+    stop_payload,
+    vehicle_query_payload,
+    vehicle_state_payload,
+)
 
 INSTRUCTIONS = (
     "Servidor no oficial de tiempos en vivo del Tranvía de Tenerife (Metrotenerife). "
     "Usa buscar_parada si la persona dice un nombre y no un código de tres letras. "
-    "proximos_tranvias y estado_tranvias son datos en vivo: di la hora de actualización "
-    "y que la fuente no es una API oficial. info_lineas es un catálogo estático, no un horario. "
+    "proximos_tranvias, estado_tranvias e info_vehiculo son datos en vivo: di la hora de "
+    "actualización y que la fuente no es una API oficial. El número de vehículo es el que va "
+    "pintado en el tranvía; si falta o la fila es vieja, di que es desconocido. "
+    "info_lineas es un catálogo estático, no un horario. "
     "De momento el único operador es 'tranvia'; el parámetro operador existe para añadir otros."
 )
 
@@ -160,9 +166,35 @@ def build_server(**client_kwargs: Any) -> MCPServer:
                     "La ocupación antigua se descarta."
                 ),
                 "ocupacion_disponible": snapshot.occupancy_available,
-                "tranvias": [_vehicle_payload(vehicle) for vehicle in snapshot.vehicles],
+                "tranvias": [vehicle_state_payload(vehicle) for vehicle in snapshot.vehicles],
             }
         )
+
+    @server.tool(
+        description=(
+            "Consulta un tranvía por el número pintado en la unidad. "
+            "Devuelve servicio, línea, destino, posición, próxima parada y ocupación "
+            "solo si el dato es reciente. Si no circula o la fila es vieja, lo dice."
+        )
+    )
+    async def info_vehiculo(
+        numero: int,
+        operador: str = "tranvia",
+        *,
+        ctx: Context,
+    ) -> str:
+        """Estado de una unidad por su número, no por el servicio."""
+        if numero < 1:
+            raise ToolError("El número de vehículo tiene que ser un entero positivo.")
+        registry = _registry(ctx)
+        operator = _operator(registry, operador)
+        try:
+            report = await operator.describe_vehicle(numero)
+        except ValueError as err:
+            raise ToolError(str(err)) from err
+        except MetrotenerifeError as err:
+            raise ToolError(str(err)) from err
+        return _dump(vehicle_query_payload(report))
 
     @server.tool(description="Líneas, sentidos y paradas en orden. Es catálogo, no un horario.")
     async def info_lineas(
@@ -248,31 +280,6 @@ def _validate_filters(line: int | None, direction: int | None) -> None:
         raise ToolError("La línea tiene que ser 1 o 2.")
     if direction is not None and direction not in (1, 2):
         raise ToolError("El sentido tiene que ser 1 o 2.")
-
-
-def _vehicle_payload(vehicle: Vehicle) -> dict[str, Any]:
-    updated: datetime | None = vehicle.occupancy_updated_at
-    return {
-        "servicio": vehicle.service,
-        "linea": vehicle.line,
-        "sentido": vehicle.direction,
-        "sentido_etiqueta": direction_label(vehicle.line, vehicle.direction),
-        "destino": vehicle.destination_name,
-        "destino_codigo": vehicle.destination_code,
-        "proxima_parada": vehicle.next_stop_name,
-        "proxima_parada_codigo": vehicle.next_stop_code,
-        "minutos_proxima_parada": vehicle.minutes_to_next,
-        "lat": vehicle.lat,
-        "lon": vehicle.lon,
-        "ocupacion_cruda": vehicle.occupancy_raw,
-        "ocupacion_porcentaje": vehicle.occupancy_percent,
-        "ocupacion_muy_alta": vehicle.occupancy_high,
-        "ocupacion_fresca": vehicle.occupancy_percent is not None,
-        "vehiculo": vehicle.vehicle_id,
-        "ocupacion_actualizada": updated.isoformat() if updated else None,
-        "ocupacion_descartada": vehicle.occupancy_discarded,
-        "ocupacion_significado": OCCUPANCY_MEANING,
-    }
 
 
 def _dump(payload: dict[str, Any]) -> str:
