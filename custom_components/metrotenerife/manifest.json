@@ -1,0 +1,14 @@
+{
+  "domain": "metrotenerife",
+  "name": "Tranvía de Tenerife",
+  "codeowners": ["@Yannedugo"],
+  "config_flow": true,
+  "documentation": "https://github.com/Yannedugo/metrotenerife-mcp",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Yannedugo/metrotenerife-mcp/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0",
+  "categories": ["vehicles_transport.public_transport"]
+}

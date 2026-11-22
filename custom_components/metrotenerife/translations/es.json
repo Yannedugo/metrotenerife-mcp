@@ -1,0 +1,121 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Tranvía de Tenerife ya está configurado. Añade paradas desde la integración existente.",
+      "single_instance_allowed": "Tranvía de Tenerife ya está configurado. Añade paradas desde la integración existente."
+    },
+    "error": {
+      "interval_too_short": "El intervalo de sondeo tiene que ser de al menos 60 segundos."
+    },
+    "step": {
+      "user": {
+        "title": "Tranvía de Tenerife",
+        "description": "Integración no oficial, sin afiliación con Metropolitano de Tenerife ni con el Cabildo de Tenerife. Los tiempos en vivo salen de TranvíaOnline. Después de añadirla, usa «Añadir parada» para cada parada que quieras seguir. El sondeo por defecto es de 90 segundos y no puede bajar de 60.",
+        "data": {
+          "scan_interval": "Intervalo de sondeo (segundos)"
+        },
+        "data_description": {
+          "scan_interval": "Mínimo 60 segundos. Una sola petición cubre todas las paradas configuradas."
+        }
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "interval_too_short": "El intervalo de sondeo tiene que ser de al menos 60 segundos."
+    },
+    "step": {
+      "init": {
+        "title": "Intervalo de sondeo",
+        "description": "Cada cuánto se consulta TranvíaOnline. Mínimo 60 segundos, para no insistir en una fuente que no es oficial.",
+        "data": {
+          "scan_interval": "Intervalo de sondeo (segundos)"
+        },
+        "data_description": {
+          "scan_interval": "Mínimo 60 segundos. Una sola petición cubre todas las paradas configuradas."
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "stop": {
+      "entry_type": "Parada",
+      "initiate_flow": {
+        "user": "Añadir parada",
+        "reconfigure": "Reconfigurar parada"
+      },
+      "abort": {
+        "already_configured": "Esta parada ya está configurada con el mismo filtro de línea y sentido.",
+        "reconfigure_successful": "Se ha actualizado la parada.",
+        "stop_not_found": "Esa parada no está en el catálogo."
+      },
+      "error": {
+        "invalid_line": "Esa línea no pasa por esta parada.",
+        "stop_not_found": "No hay ninguna parada que coincida. Prueba un código como INT o parte del nombre."
+      },
+      "step": {
+        "user": {
+          "title": "Buscar parada del tranvía",
+          "description": "Escribe un código de tres letras (INT, WEY, CAR) o parte del nombre. No importan las tildes ni las mayúsculas.",
+          "data": {
+            "query": "Código o nombre"
+          },
+          "data_description": {
+            "query": "Por ejemplo: Guimerá, cardonal, INT o 01."
+          }
+        },
+        "select_stop": {
+          "title": "Elegir parada",
+          "description": "Hay varias paradas que coinciden. Elige una o busca de nuevo.",
+          "data": {
+            "stop_code": "Parada coincidente",
+            "search_again": "Buscar otra vez"
+          },
+          "data_description": {
+            "stop_code": "La etiqueta muestra el código y las líneas que pasan por la parada.",
+            "search_again": "Vuelve al buscador sin elegir parada."
+          }
+        },
+        "configure": {
+          "title": "Configurar {stop_name}",
+          "description": "Parada {stop_name} ({stop_code}). La línea y el sentido son opcionales. Déjalos vacíos para seguir todos los tranvías de esta parada.",
+          "data": {
+            "lines": "Líneas (opcional)",
+            "direction": "Sentido (opcional)",
+            "name": "Nombre en Home Assistant",
+            "search_again": "Buscar otra parada"
+          },
+          "data_description": {
+            "lines": "Si eliges líneas, cada una tiene además su propio sensor. Vacío significa todas las líneas de la parada.",
+            "direction": "El sentido 1 y el 2 dependen de la línea. En la línea 1, 1 va hacia La Trinidad y 2 hacia Intercambiador. En la línea 2, 1 va hacia La Cuesta y 2 hacia Tíncer.",
+            "name": "Solo cambia el nombre del dispositivo. No cambia la parada.",
+            "search_again": "Vuelve al buscador sin guardar."
+          }
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Actualizar"
+      }
+    },
+    "sensor": {
+      "next_tram": {
+        "name": "Próximo tranvía"
+      },
+      "minutes": {
+        "name": "Minutos"
+      },
+      "line_next_tram": {
+        "name": "Línea {line}"
+      }
+    }
+  },
+  "exceptions": {
+    "refresh_cooldown": {
+      "message": "Espera {seconds} segundos antes de volver a actualizar."
+    }
+  }
+}

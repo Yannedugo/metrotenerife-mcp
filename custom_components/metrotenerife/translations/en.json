@@ -1,0 +1,121 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Tranvía de Tenerife is already configured. Add stops from the existing integration.",
+      "single_instance_allowed": "Tranvía de Tenerife is already configured. Add stops from the existing integration."
+    },
+    "error": {
+      "interval_too_short": "The polling interval must be at least 60 seconds."
+    },
+    "step": {
+      "user": {
+        "title": "Tranvía de Tenerife",
+        "description": "Unofficial integration. It is not affiliated with Metropolitano de Tenerife or the Cabildo de Tenerife. Live times come from TranvíaOnline. After adding it, use Add stop for each stop you want to follow. The default poll is 90 seconds and cannot be shorter than 60.",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        },
+        "data_description": {
+          "scan_interval": "Minimum 60 seconds. One request covers every configured stop."
+        }
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "interval_too_short": "The polling interval must be at least 60 seconds."
+    },
+    "step": {
+      "init": {
+        "title": "Polling interval",
+        "description": "How often to ask TranvíaOnline. Minimum 60 seconds, so the unofficial source is not polled too often.",
+        "data": {
+          "scan_interval": "Polling interval (seconds)"
+        },
+        "data_description": {
+          "scan_interval": "Minimum 60 seconds. One request covers every configured stop."
+        }
+      }
+    }
+  },
+  "config_subentries": {
+    "stop": {
+      "entry_type": "Stop",
+      "initiate_flow": {
+        "user": "Add stop",
+        "reconfigure": "Reconfigure stop"
+      },
+      "abort": {
+        "already_configured": "This stop is already configured with the same line and direction filter.",
+        "reconfigure_successful": "Stop settings updated.",
+        "stop_not_found": "That stop is not in the catalog."
+      },
+      "error": {
+        "invalid_line": "That line does not serve this stop.",
+        "stop_not_found": "No matching stop. Try a code such as INT or part of the name."
+      },
+      "step": {
+        "user": {
+          "title": "Find a tram stop",
+          "description": "Type a three-letter code (INT, WEY, CAR) or part of the name. Accents and capital letters do not matter.",
+          "data": {
+            "query": "Code or name"
+          },
+          "data_description": {
+            "query": "For example: Guimerá, cardonal, INT or 01."
+          }
+        },
+        "select_stop": {
+          "title": "Choose the stop",
+          "description": "Several stops match. Pick one, or search again.",
+          "data": {
+            "stop_code": "Matching stop",
+            "search_again": "Search again"
+          },
+          "data_description": {
+            "stop_code": "The code and the lines that serve the stop are shown in the label.",
+            "search_again": "Go back to the search box without choosing a stop."
+          }
+        },
+        "configure": {
+          "title": "Configure {stop_name}",
+          "description": "Stop {stop_name} ({stop_code}). Line and direction are optional. Leave them empty to follow every tram at this stop.",
+          "data": {
+            "lines": "Lines (optional)",
+            "direction": "Direction (optional)",
+            "name": "Name in Home Assistant",
+            "search_again": "Search for a different stop"
+          },
+          "data_description": {
+            "lines": "If you pick lines, each one also gets its own sensor. Empty means all lines at this stop.",
+            "direction": "Direction 1 and 2 depend on the line. On Line 1, 1 is towards La Trinidad and 2 towards Intercambiador. On Line 2, 1 is towards La Cuesta and 2 towards Tíncer.",
+            "name": "Only changes the device name. It does not change the stop.",
+            "search_again": "Go back to the search box without saving."
+          }
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "refresh": {
+        "name": "Refresh"
+      }
+    },
+    "sensor": {
+      "next_tram": {
+        "name": "Next tram"
+      },
+      "minutes": {
+        "name": "Minutes"
+      },
+      "line_next_tram": {
+        "name": "Line {line}"
+      }
+    }
+  },
+  "exceptions": {
+    "refresh_cooldown": {
+      "message": "Wait {seconds} seconds before refreshing again."
+    }
+  }
+}

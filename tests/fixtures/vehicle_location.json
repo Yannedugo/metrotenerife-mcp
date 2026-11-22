@@ -1,0 +1,26 @@
+[
+  {
+    "service": "409",
+    "coordinate": {"lat": 28.448912, "lon": -16.296415},
+    "route": 2,
+    "direction": 2,
+    "remainingMinutes": 0,
+    "nextStop": "JER",
+    "nextStopDescription": "San Jerónimo",
+    "destinationStop": "TIN",
+    "destinationStopDescription": "TINCER",
+    "orderStop": 5
+  },
+  {
+    "service": "405",
+    "coordinate": {"lat": 28.4595, "lon": -16.252},
+    "route": 1,
+    "direction": 1,
+    "remainingMinutes": 3,
+    "nextStop": "FUN",
+    "nextStopDescription": "Fundación",
+    "destinationStop": "TRI",
+    "destinationStopDescription": "LA TRINIDAD",
+    "orderStop": 2
+  }
+]

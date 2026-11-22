@@ -1,0 +1,525 @@
+"""Cliente asíncrono de TranvíaOnline.
+
+La web oficial sondea cada pocos segundos. Este cliente no lo hace: caché corta,
+una petición en vuelo y reintentos con espera solo ante 429 o 5xx. La API no es
+oficial y no hay que redistribuir el JSON crudo.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import random
+import re
+from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime, timedelta
+from email.utils import parsedate_to_datetime
+from typing import Any
+from zoneinfo import ZoneInfo
+
+import aiohttp
+
+from metrotenerife.errors import (
+    HttpStatusError,
+    ParseError,
+    RequestTimeoutError,
+    StopNotFoundError,
+    TransportError,
+)
+from metrotenerife.models import Arrival, Occupancy, Vehicle, VehicleSnapshot
+
+logger = logging.getLogger(__name__)
+
+USER_AGENT = (
+    "metrotenerife/0.1.0 (+https://github.com/Yannedugo/metrotenerife-mcp; "
+    "uso personal, fuente no oficial)"
+)
+DEFAULT_BASE_URL = "https://tranviaonline.metrotenerife.com"
+CANARY = ZoneInfo("Atlantic/Canary")
+_STOP_CODE = re.compile(r"^[A-Z0-9]{2,4}$")
+_LOCAL_TIME = "%d/%m/%Y %H:%M:%S"
+
+Sleeper = Callable[[float], Awaitable[None]]
+
+
+class _TTLCache:
+    def __init__(self, ttl: float) -> None:
+        self._ttl = ttl
+        self._items: dict[str, tuple[float, Any]] = {}
+
+    def get(self, key: str) -> Any | None:
+        item = self._items.get(key)
+        if item is None:
+            return None
+        expires, value = item
+        if expires <= asyncio.get_running_loop().time():
+            self._items.pop(key, None)
+            return None
+        return value
+
+    def set(self, key: str, value: Any) -> None:
+        self._items[key] = (asyncio.get_running_loop().time() + self._ttl, value)
+
+
+class TranviaOnlineClient:
+    """Consultas a los JSON de TranvíaOnline."""
+
+    def __init__(
+        self,
+        session: aiohttp.ClientSession | None = None,
+        *,
+        base_url: str = DEFAULT_BASE_URL,
+        timeout: float = 12.0,
+        cache_ttl: float = 20.0,
+        min_interval: float = 1.0,
+        max_retries: int = 2,
+        user_agent: str = USER_AGENT,
+        occupancy_max_age: float = 180.0,
+        sleeper: Sleeper | None = None,
+    ) -> None:
+        self._session = session
+        self._owns_session = session is None
+        self._base_url = base_url.rstrip("/")
+        self._timeout = timeout
+        self._min_interval = min_interval
+        self._max_retries = max_retries
+        self._user_agent = user_agent
+        self._occupancy_max_age = timedelta(seconds=occupancy_max_age)
+        self._sleeper = sleeper or asyncio.sleep
+        self._cache = _TTLCache(cache_ttl)
+        self._lock = asyncio.Lock()
+        self._last_request_at: float | None = None
+
+    async def __aenter__(self) -> TranviaOnlineClient:
+        self._ensure_session()
+        return self
+
+    async def __aexit__(self, *_exc: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        """Cierra la sesión solo si la creó este cliente."""
+        if self._owns_session and self._session is not None and not self._session.closed:
+            await self._session.close()
+
+    def _ensure_session(self) -> aiohttp.ClientSession:
+        if self._session is None:
+            self._session = aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self._timeout)
+            )
+            self._owns_session = True
+        return self._session
+
+    async def panel(self, stop_code: str) -> list[Arrival]:
+        """Próximos tranvías anunciados en una parada."""
+        code = normalize_stop_code(stop_code)
+        try:
+            payload = await self._get_json(f"/api/infoStops/infoPanel/{code}")
+        except HttpStatusError as err:
+            if err.status == 404:
+                raise StopNotFoundError(code) from err
+            raise
+        return _sort_arrivals(parse_arrivals(payload))
+
+    async def panels(self) -> dict[str, list[Arrival]]:
+        """Próximos tranvías de todas las paradas, agrupados por código.
+
+        Una sola petición sirve para varias paradas. La forma exacta del JSON
+        global no está documentada: se acepta una lista plana o un objeto cuyas
+        listas contienen los mismos elementos que el panel de una parada.
+        """
+        payload = await self._get_json("/api/infoStops/infoPanel")
+        grouped: dict[str, list[Arrival]] = {}
+        for arrival in parse_arrivals(payload):
+            grouped.setdefault(arrival.stop_code, []).append(arrival)
+        return {code: _sort_arrivals(items) for code, items in grouped.items()}
+
+    async def vehicles(self, *, now: datetime | None = None) -> VehicleSnapshot:
+        """Posición de las unidades, con ocupación solo si el dato es reciente.
+
+        Si la ocupación falla, se devuelven igual las posiciones.
+        """
+        moment = now or datetime.now(UTC)
+        locations = await self._get_json("/api/infoStops/vehicleLocation")
+        vehicles = parse_vehicles(locations)
+        occupancy_available = True
+        fresh: dict[str, Occupancy] = {}
+        stale: set[str] = set()
+        try:
+            payload = await self._get_json("/api/cargaVehiculo")
+        except (HttpStatusError, RequestTimeoutError, ParseError):
+            logger.warning("No se pudo leer la ocupación; se devuelven solo las posiciones")
+            occupancy_available = False
+        else:
+            fresh, stale = parse_occupancy(payload, now=moment, max_age=self._occupancy_max_age)
+        merged = tuple(merge_occupancy(vehicle, fresh, stale) for vehicle in vehicles)
+        return VehicleSnapshot(
+            vehicles=merged, fetched_at=moment, occupancy_available=occupancy_available
+        )
+
+    async def _get_json(self, path: str) -> Any:
+        cached = self._cache.get(path)
+        if cached is not None:
+            return cached
+        async with self._lock:
+            cached = self._cache.get(path)
+            if cached is not None:
+                return cached
+            payload = await self._fetch_with_retries(path)
+            self._cache.set(path, payload)
+            return payload
+
+    async def _fetch_with_retries(self, path: str) -> Any:
+        last_error: HttpStatusError | RequestTimeoutError | None = None
+        for attempt in range(self._max_retries + 1):
+            if last_error is not None:
+                await self._sleeper(self._backoff_seconds(attempt, last_error))
+            await self._pace()
+            try:
+                return await self._fetch_once(path)
+            except HttpStatusError as err:
+                if not err.retryable or attempt == self._max_retries:
+                    raise
+                last_error = err
+                logger.info("Reintento %s de %s tras HTTP %s", attempt + 1, path, err.status)
+            except (RequestTimeoutError, TransportError) as err:
+                if attempt == self._max_retries:
+                    raise
+                last_error = (
+                    err
+                    if isinstance(err, HttpStatusError | RequestTimeoutError)
+                    else RequestTimeoutError(path)
+                )
+                logger.info("Reintento %s de %s tras un fallo de red", attempt + 1, path)
+        raise RequestTimeoutError(path)
+
+    async def _fetch_once(self, path: str) -> Any:
+        session = self._ensure_session()
+        url = f"{self._base_url}{path}"
+        headers = {"User-Agent": self._user_agent, "Accept": "application/json"}
+        timeout = aiohttp.ClientTimeout(total=self._timeout)
+        try:
+            async with session.get(url, headers=headers, timeout=timeout) as response:
+                if response.status >= 400:
+                    raise HttpStatusError(
+                        response.status, path, retry_after=_retry_after(response.headers)
+                    )
+                try:
+                    return await response.json(content_type=None)
+                except (aiohttp.ContentTypeError, json.JSONDecodeError, TypeError) as err:
+                    raise ParseError() from err
+        except TimeoutError as err:
+            raise RequestTimeoutError(path) from err
+        except aiohttp.ClientError as err:
+            raise TransportError(f"No se pudo conectar con TranvíaOnline ({path}).") from err
+
+    async def _pace(self) -> None:
+        """Separa las peticiones para no encadenarlas."""
+        loop = asyncio.get_running_loop()
+        if self._last_request_at is not None:
+            wait = self._min_interval - (loop.time() - self._last_request_at)
+            if wait > 0:
+                await self._sleeper(wait)
+        self._last_request_at = asyncio.get_running_loop().time()
+
+    def _backoff_seconds(self, attempt: int, error: HttpStatusError | RequestTimeoutError) -> float:
+        if isinstance(error, HttpStatusError) and error.retry_after is not None:
+            return min(error.retry_after, 30.0)
+        base = min(8.0, 0.8 * (2 ** (attempt - 1)))
+        return base + random.uniform(0, 0.3)
+
+
+def normalize_stop_code(value: str) -> str:
+    """Código de tres o cuatro caracteres, o error si no puede ser una parada."""
+    code = value.strip().upper()
+    if not _STOP_CODE.fullmatch(code):
+        raise StopNotFoundError(value)
+    return code
+
+
+def parse_arrivals(payload: Any, *, now: datetime | None = None) -> list[Arrival]:
+    """Convierte el JSON de un panel en llegadas.
+
+    Los elementos ilegibles se omiten. Si había elementos y ninguno vale, es
+    un cambio de formato, no una parada vacía.
+    """
+    items = _as_dicts(payload)
+    if not items:
+        return []
+    moment = now or datetime.now(UTC)
+    arrivals: list[Arrival] = []
+    for item in items:
+        arrival = _parse_arrival(item, moment)
+        if arrival is not None:
+            arrivals.append(arrival)
+    if not arrivals:
+        raise ParseError()
+    return arrivals
+
+
+def parse_vehicles(payload: Any) -> list[Vehicle]:
+    items = _as_dicts(payload)
+    if not items:
+        return []
+    vehicles = [vehicle for item in items if (vehicle := _parse_vehicle(item)) is not None]
+    if not vehicles:
+        raise ParseError()
+    return vehicles
+
+
+def parse_occupancy(
+    payload: Any, *, now: datetime, max_age: timedelta
+) -> tuple[dict[str, Occupancy], set[str]]:
+    """Separa ocupación reciente de servicios con fecha vieja.
+
+    TranvíaOnline deja filas de servicios que ya no circulan. Esas filas no se
+    asocian a una unidad.
+    """
+    items = _as_dicts(payload)
+    fresh: dict[str, Occupancy] = {}
+    stale: set[str] = set()
+    for item in items:
+        parsed = _parse_occupancy_item(item)
+        if parsed is None:
+            continue
+        if now - parsed.updated_at > max_age or parsed.updated_at - now > timedelta(minutes=5):
+            stale.add(parsed.service)
+            continue
+        current = fresh.get(parsed.service)
+        if current is None or parsed.updated_at >= current.updated_at:
+            fresh[parsed.service] = parsed
+    return fresh, stale
+
+
+def merge_occupancy(vehicle: Vehicle, fresh: dict[str, Occupancy], stale: set[str]) -> Vehicle:
+    occupancy = fresh.get(vehicle.service)
+    if occupancy is None:
+        if vehicle.service not in stale:
+            return vehicle
+        return Vehicle(
+            service=vehicle.service,
+            lat=vehicle.lat,
+            lon=vehicle.lon,
+            line=vehicle.line,
+            direction=vehicle.direction,
+            minutes_to_next=vehicle.minutes_to_next,
+            next_stop_code=vehicle.next_stop_code,
+            next_stop_name=vehicle.next_stop_name,
+            destination_code=vehicle.destination_code,
+            destination_name=vehicle.destination_name,
+            order=vehicle.order,
+            occupancy_discarded=True,
+        )
+    return Vehicle(
+        service=vehicle.service,
+        lat=vehicle.lat,
+        lon=vehicle.lon,
+        line=vehicle.line,
+        direction=vehicle.direction,
+        minutes_to_next=vehicle.minutes_to_next,
+        next_stop_code=vehicle.next_stop_code,
+        next_stop_name=vehicle.next_stop_name,
+        destination_code=vehicle.destination_code,
+        destination_name=vehicle.destination_name,
+        order=vehicle.order,
+        occupancy_percent=occupancy.percent,
+        vehicle_id=occupancy.vehicle_id,
+        occupancy_updated_at=occupancy.updated_at,
+    )
+
+
+def filter_arrivals(
+    arrivals: list[Arrival] | tuple[Arrival, ...],
+    *,
+    line: int | None = None,
+    lines: tuple[int, ...] | list[int] | None = None,
+    direction: int | None = None,
+    destination: str | None = None,
+) -> list[Arrival]:
+    """Filtra y ordena llegadas por línea, sentido o destino."""
+    allowed = set(lines or ())
+    if line is not None:
+        allowed.add(line)
+    folded_destination = fold_destination(destination)
+    selected: list[Arrival] = []
+    for arrival in arrivals:
+        if allowed and arrival.line not in allowed:
+            continue
+        if direction is not None and arrival.direction != direction:
+            continue
+        if folded_destination and not _destination_matches(arrival, folded_destination):
+            continue
+        selected.append(arrival)
+    return _sort_arrivals(selected)
+
+
+def fold_destination(destination: str | None) -> str:
+    from metrotenerife.text import fold
+
+    return fold(destination or "")
+
+
+def _destination_matches(arrival: Arrival, folded_destination: str) -> bool:
+    from metrotenerife.text import fold
+
+    code = fold(arrival.destination_code)
+    name = fold(arrival.destination_name)
+    return folded_destination == code or folded_destination in name
+
+
+def _sort_arrivals(arrivals: list[Arrival]) -> list[Arrival]:
+    return sorted(
+        arrivals, key=lambda arrival: (arrival.minutes, arrival.line, arrival.destination_name)
+    )
+
+
+def _as_dicts(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        dicts = [item for item in payload if isinstance(item, dict)]
+        if payload and not dicts:
+            raise ParseError()
+        return dicts
+    if isinstance(payload, dict):
+        if (
+            "stop" in payload
+            or "service" in payload
+            or "SERVICIO" in payload
+            or "coordinate" in payload
+        ):
+            return [payload]
+        collected: list[dict[str, Any]] = []
+        for value in payload.values():
+            if isinstance(value, list):
+                collected.extend(item for item in value if isinstance(item, dict))
+            elif isinstance(value, dict) and (
+                "stop" in value
+                or "service" in value
+                or "SERVICIO" in value
+                or "coordinate" in value
+            ):
+                collected.append(value)
+        if collected:
+            return collected
+    raise ParseError()
+
+
+def _parse_arrival(item: dict[str, Any], now: datetime) -> Arrival | None:
+    try:
+        minutes = int(item["remainingMinutes"])
+        line = int(item["route"])
+        direction = int(item["direction"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if minutes < 0 or line <= 0 or direction <= 0:
+        return None
+    stop_code = str(item.get("stop") or "").strip().upper()
+    destination_code = str(item.get("destinationStop") or "").strip().upper()
+    service = str(item.get("service") or "").strip()
+    if not stop_code or not destination_code or not service:
+        return None
+    updated_at, approximate = _timestamp(item, now)
+    order = item.get("orderStop")
+    return Arrival(
+        service=service,
+        stop_code=stop_code,
+        stop_name=_title(item.get("stopDescription"), stop_code),
+        destination_code=destination_code,
+        destination_name=_title(item.get("destinationStopDescription"), destination_code),
+        line=line,
+        direction=direction,
+        minutes=minutes,
+        updated_at=updated_at,
+        order=int(order) if isinstance(order, int | float | str) and str(order).isdigit() else None,
+        approximate=approximate,
+    )
+
+
+def _parse_vehicle(item: dict[str, Any]) -> Vehicle | None:
+    coordinate = item.get("coordinate")
+    if not isinstance(coordinate, dict):
+        return None
+    try:
+        lat = float(coordinate["lat"])
+        lon = float(coordinate["lon"])
+        line = int(item["route"])
+        direction = int(item["direction"])
+        minutes = int(item.get("remainingMinutes") or 0)
+    except (KeyError, TypeError, ValueError):
+        return None
+    service = str(item.get("service") or "").strip()
+    next_stop = str(item.get("nextStop") or "").strip().upper()
+    destination = str(item.get("destinationStop") or "").strip().upper()
+    if not service or not next_stop or not destination:
+        return None
+    order = item.get("orderStop")
+    return Vehicle(
+        service=service,
+        lat=lat,
+        lon=lon,
+        line=line,
+        direction=direction,
+        minutes_to_next=minutes,
+        next_stop_code=next_stop,
+        next_stop_name=_title(item.get("nextStopDescription"), next_stop),
+        destination_code=destination,
+        destination_name=_title(item.get("destinationStopDescription"), destination),
+        order=int(order) if isinstance(order, int | float | str) and str(order).isdigit() else None,
+    )
+
+
+def _parse_occupancy_item(item: dict[str, Any]) -> Occupancy | None:
+    service = str(item.get("SERVICIO") if item.get("SERVICIO") is not None else "").strip()
+    if not service:
+        return None
+    try:
+        percent = int(item["CARGA"])
+        updated_at = _parse_local(str(item["FECHA"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    vehicle = item.get("VEHICULO")
+    vehicle_id = (
+        int(vehicle) if isinstance(vehicle, int | float | str) and str(vehicle).isdigit() else None
+    )
+    return Occupancy(service=service, percent=percent, updated_at=updated_at, vehicle_id=vehicle_id)
+
+
+def _timestamp(item: dict[str, Any], now: datetime) -> tuple[datetime, bool]:
+    raw = item.get("lastUpdate")
+    if isinstance(raw, int | float) and raw > 0:
+        return datetime.fromtimestamp(raw / 1000, tz=UTC), False
+    formatted = item.get("lastUpdateFormatted")
+    if isinstance(formatted, str) and formatted.strip():
+        try:
+            return _parse_local(formatted), False
+        except ValueError:
+            pass
+    return now, True
+
+
+def _parse_local(value: str) -> datetime:
+    naive = datetime.strptime(value.strip(), _LOCAL_TIME)
+    return naive.replace(tzinfo=CANARY)
+
+
+def _title(value: Any, fallback: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        return fallback
+    return " ".join(part.capitalize() for part in value.split())
+
+
+def _retry_after(headers: Any) -> float | None:
+    raw = headers.get("Retry-After")
+    if not raw:
+        return None
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        pass
+    try:
+        moment = parsedate_to_datetime(raw)
+    except (TypeError, ValueError, IndexError):
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return max(0.0, (moment - datetime.now(UTC)).total_seconds())
