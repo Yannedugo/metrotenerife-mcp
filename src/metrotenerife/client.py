@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 import aiohttp
 import certifi
 
+from metrotenerife._version import __version__
 from metrotenerife.errors import (
     HttpStatusError,
     ParseError,
@@ -40,7 +41,7 @@ logger = logging.getLogger(__name__)
 _VEHICLE_ID_KEYS = ("VEHICULO", "vehiculo", "vehicleId", "numeroVehiculo")
 
 USER_AGENT = (
-    "metrotenerife/0.1.0 (+https://github.com/Yannedugo/metrotenerife-mcp; "
+    f"metrotenerife/{__version__} (+https://github.com/Yannedugo/metrotenerife-mcp; "
     "contacto: https://github.com/Yannedugo/metrotenerife-mcp/issues; "
     "uso personal, no oficial, sin ánimo de lucro)"
 )
