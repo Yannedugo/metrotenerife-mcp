@@ -56,12 +56,16 @@ class TransitOperator(Protocol):
 
     id: str
     name: str
+    catalog: Catalog
 
     def search_stops(self, query: str, *, limit: int = 8) -> list[Stop]:
         """Busca paradas en el catálogo del operador."""
 
     def lines(self) -> list[Line]:
         """Líneas y paradas en orden. No son horarios."""
+
+    def resolve_stop(self, query: str) -> Stop:
+        """Un código exacto, un nombre único, o un error si hay varias paradas."""
 
     async def arrivals(
         self,
@@ -73,6 +77,18 @@ class TransitOperator(Protocol):
         per_direction: int = 3,
     ) -> tuple[Stop, list[Arrival], datetime, list[dict[str, object]]]:
         """Parada, llegadas (hasta N por sentido) y notas si no hubo estimación."""
+
+    async def forecast(
+        self,
+        stop: str,
+        *,
+        desde: str | None = None,
+        hasta: str | None = None,
+        minutos: int | None = None,
+        line: int | None = None,
+        direction: int | None = None,
+    ) -> tuple[Stop, list[Passage], datetime, datetime, bool, str]:
+        """Pasos previstos en la ventana y, si está cerca, los que anuncia la fuente."""
 
     async def describe_vehicle(self, number: int) -> VehicleQuery:
         """Estado de un tranvía por el número pintado. Lo viejo no es el estado actual."""
