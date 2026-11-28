@@ -10,16 +10,16 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Protocol
 
-from metrotenerife.catalog import Catalog, load_catalog
-from metrotenerife.client import TranviaOnlineClient, filter_arrivals
-from metrotenerife.errors import (
+from .catalog import Catalog, load_catalog
+from .client import TranviaOnlineClient, filter_arrivals
+from .errors import (
     AmbiguousStopError,
     MetrotenerifeError,
     OperatorNotFoundError,
     StopNotFoundError,
 )
-from metrotenerife.estimate import limit_per_direction
-from metrotenerife.forecast import (
+from .estimate import limit_per_direction
+from .forecast import (
     AVISO_PREVISTO,
     Passage,
     load_schedule,
@@ -28,8 +28,17 @@ from metrotenerife.forecast import (
     theoretical_passages,
     wants_live,
 )
-from metrotenerife.models import Arrival, Line, Stop, Vehicle, VehiclePosition, VehicleSnapshot
-from metrotenerife.text import fold
+from .models import (
+    Arrival,
+    Line,
+    Occupancy,
+    Stop,
+    Vehicle,
+    VehiclePosition,
+    VehicleSnapshot,
+)
+from .occupancy import HIGH_CARGA, normalize_carga
+from .text import fold
 
 AVISO_EN_VIVO = (
     "Datos en vivo de TranvíaOnline (fuente no oficial de Metrotenerife). "
@@ -47,12 +56,16 @@ class TransitOperator(Protocol):
 
     id: str
     name: str
+    catalog: Catalog
 
     def search_stops(self, query: str, *, limit: int = 8) -> list[Stop]:
         """Busca paradas en el catálogo del operador."""
 
     def lines(self) -> list[Line]:
         """Líneas y paradas en orden. No son horarios."""
+
+    def resolve_stop(self, query: str) -> Stop:
+        """Un código exacto, un nombre único, o un error si hay varias paradas."""
 
     async def arrivals(
         self,
@@ -64,6 +77,18 @@ class TransitOperator(Protocol):
         per_direction: int = 3,
     ) -> tuple[Stop, list[Arrival], datetime, list[dict[str, object]]]:
         """Parada, llegadas (hasta N por sentido) y notas si no hubo estimación."""
+
+    async def forecast(
+        self,
+        stop: str,
+        *,
+        desde: str | None = None,
+        hasta: str | None = None,
+        minutos: int | None = None,
+        line: int | None = None,
+        direction: int | None = None,
+    ) -> tuple[Stop, list[Passage], datetime, datetime, bool, str]:
+        """Pasos previstos en la ventana y, si está cerca, los que anuncia la fuente."""
 
     async def describe_vehicle(self, number: int) -> VehicleQuery:
         """Estado de un tranvía por el número pintado. Lo viejo no es el estado actual."""
@@ -318,19 +343,14 @@ class VehicleQuery:
 def _describe_vehicle(
     number: int,
     *,
-    fresh: dict[str, object],
-    stale: tuple[object, ...],
+    fresh: dict[str, Occupancy],
+    stale: tuple[Occupancy, ...],
     located: list[Vehicle],
     fetched_at: datetime,
     occupancy_available: bool,
     position_available: bool,
 ) -> VehicleQuery:
-    from metrotenerife.models import Occupancy
-    from metrotenerife.occupancy import HIGH_CARGA, normalize_carga
-
-    fresh_rows = [
-        row for row in fresh.values() if isinstance(row, Occupancy) and row.vehicle_id == number
-    ]
+    fresh_rows = [row for row in fresh.values() if row.vehicle_id == number]
     fresh_rows.sort(key=lambda row: row.updated_at, reverse=True)
     by_service = {vehicle.service: vehicle for vehicle in located}
     located_by_number = [
@@ -399,7 +419,7 @@ def _describe_vehicle(
             vehicle=vehicle,
         )
 
-    stale_rows = [row for row in stale if isinstance(row, Occupancy) and row.vehicle_id == number]
+    stale_rows = [row for row in stale if row.vehicle_id == number]
     if stale_rows:
         newest = max(stale_rows, key=lambda row: row.updated_at)
         return VehicleQuery(

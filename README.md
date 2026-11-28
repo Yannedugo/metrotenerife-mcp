@@ -106,7 +106,7 @@ En la demo, «Próximas horas» enseña las tres horas siguientes de la parada e
 
 ## Home Assistant
 
-La integración es custom. El botón de abajo abre el asistente de HACS **cuando el repositorio sea público**. Mientras siga privado, HACS no puede añadirlo: copia `custom_components/metrotenerife` (incluida la carpeta `vendor`) en `config/custom_components/` y reinicia.
+La integración es custom. El botón de abajo abre el asistente de HACS para añadir este repositorio. Sin HACS, copia `custom_components/metrotenerife` (incluida la carpeta `vendor`) en `config/custom_components/` y reinicia.
 
 [![Abrir en Home Assistant](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Yannedugo&repository=metrotenerife-mcp&category=integration)
 
@@ -155,7 +155,7 @@ python3 scripts/sync_vendor.py --check
 python3 -m pytest -q
 ```
 
-Los tests no llaman a TranvíaOnline: usan respuestas grabadas. Si tocas `src/metrotenerife`, ejecuta `python3 scripts/sync_vendor.py` para copiar la librería dentro de la integración. No subas un volcado histórico del feed en vivo.
+Los tests no llaman a TranvíaOnline: usan respuestas grabadas. Si tocas `src/metrotenerife`, ejecuta `python3 scripts/sync_vendor.py` para copiar la librería dentro de la integración; la copia es un subpaquete de la integración y el script convierte sus importaciones en relativas. No subas un volcado histórico del feed en vivo.
 
 ## Licencia
 

@@ -8,12 +8,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    name: test (Python ${{ matrix.python-version }})
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
       - name: Instalar
         run: pip install -e ".[dev,mcp]"
@@ -34,13 +39,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # hacs/action descarga el repo como público y rechaza los privados.
-      # Estas comprobaciones cubren la estructura. La action entra al publicarlo.
+      # Comprobaciones rápidas de estructura, sin red, antes de la action oficial.
       - name: Validar estructura HACS
         run: python3 scripts/validate_hacs.py
 
       - name: HACS Action
-        if: github.event.repository.visibility == 'public'
         uses: hacs/action@main
         with:
           category: integration

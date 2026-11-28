@@ -11,8 +11,8 @@ from __future__ import annotations
 import math
 from datetime import datetime
 
-from metrotenerife.catalog import Catalog
-from metrotenerife.models import Arrival, Direction, Vehicle
+from .catalog import Catalog
+from .models import Arrival, Direction, Vehicle
 
 ESTIMATE_ORIGIN = "estimado"
 OFFICIAL_ORIGIN = "tranviaonline"

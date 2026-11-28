@@ -25,7 +25,13 @@ from metrotenerife.errors import (
     StopNotFoundError,
 )
 from metrotenerife.models import Stop, direction_label
-from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, OperatorRegistry, TranviaOperator
+from metrotenerife.operators import (
+    AVISO_CATALOGO,
+    AVISO_EN_VIVO,
+    OperatorRegistry,
+    TransitOperator,
+    TranviaOperator,
+)
 from metrotenerife.present import (
     ambiguous_payload,
     forecast_payload,
@@ -272,11 +278,7 @@ def build_server(**client_kwargs: Any) -> MCPServer:
         lines = operator.lines()
         if linea is not None:
             lines = [item for item in lines if item.line == linea]
-        stops = (
-            {stop.code: stop for stop in operator.catalog.stops}
-            if isinstance(operator, TranviaOperator)
-            else {}
-        )
+        stops = {stop.code: stop for stop in operator.catalog.stops}
         payload_lines = []
         for item in lines:
             directions = []
@@ -309,9 +311,7 @@ def build_server(**client_kwargs: Any) -> MCPServer:
             {
                 "aviso": AVISO_CATALOGO,
                 "operador": operator.id,
-                "atribucion": operator.catalog.attribution
-                if isinstance(operator, TranviaOperator)
-                else None,
+                "atribucion": operator.catalog.attribution,
                 "lineas": payload_lines,
             }
         )
@@ -330,7 +330,7 @@ def _registry(ctx: Context) -> OperatorRegistry:
     return registry
 
 
-def _operator(registry: OperatorRegistry, operator_id: str) -> Any:
+def _operator(registry: OperatorRegistry, operator_id: str) -> TransitOperator:
     try:
         return registry.get(operator_id)
     except OperatorNotFoundError as err:

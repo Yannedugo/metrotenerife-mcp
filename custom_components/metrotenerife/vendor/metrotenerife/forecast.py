@@ -13,8 +13,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from metrotenerife.catalog import Catalog
-from metrotenerife.models import Arrival, Direction
+from .catalog import Catalog
+from .models import Arrival, Direction
 
 CANARY = ZoneInfo("Atlantic/Canary")
 LIVE_HORIZON = timedelta(minutes=30)
@@ -200,8 +200,13 @@ def forecast_attributes(
     direction: int | None = None,
     limit: int = 8,
     horizon_minutes: int = 120,
+    schedule: Schedule | None = None,
 ) -> list[dict[str, object]]:
-    """Próximos pasos para un atributo de Home Assistant. Como mucho `limit`."""
+    """Próximos pasos para un atributo de Home Assistant. Como mucho `limit`.
+
+    Con `schedule` ya cargado no se toca el disco; sin él se usa la tabla
+    embebida.
+    """
     start = now.astimezone(CANARY)
     end = start + timedelta(minutes=horizon_minutes)
     only_line = lines[0] if len(lines) == 1 else None
@@ -212,6 +217,7 @@ def forecast_attributes(
         end=end,
         line=only_line,
         direction=direction,
+        schedule=schedule,
     )
     if len(lines) > 1:
         allowed = set(lines)
@@ -246,7 +252,9 @@ def merge_live(
 ) -> list[Passage]:
     """Sustituye un previsto cercano por el paso que anuncia la fuente.
 
-    El margen es la mitad del intervalo, entre 90 segundos y 4 minutos.
+    Cada paso real quita como mucho un previsto: el más cercano de su misma
+    línea y sentido dentro del margen y, en caso de empate, el anterior. El
+    margen es la mitad del intervalo, entre 90 segundos y 4 minutos.
     """
     window_start = start.astimezone(CANARY)
     window_end = end.astimezone(CANARY)
@@ -267,11 +275,16 @@ def merge_live(
                 service=arrival.service,
             )
         )
-    kept: list[Passage] = []
-    for passage in forecast:
-        if any(_replaces(passage, item) for item in live):
-            continue
-        kept.append(passage)
+    replaced: set[int] = set()
+    for item in live:
+        candidates = [
+            (abs((passage.at - item.at).total_seconds()), index)
+            for index, passage in enumerate(forecast)
+            if index not in replaced and _replaces(passage, item)
+        ]
+        if candidates:
+            replaced.add(min(candidates)[1])
+    kept = [passage for index, passage in enumerate(forecast) if index not in replaced]
     merged = kept + live
     merged.sort(key=lambda item: (item.at, item.line, item.direction, item.kind))
     return merged

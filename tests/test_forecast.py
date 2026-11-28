@@ -8,7 +8,8 @@ from zoneinfo import ZoneInfo
 from aiohttp.test_utils import TestClient, TestServer
 
 from metrotenerife.catalog import load_catalog
-from metrotenerife.forecast import load_schedule, theoretical_passages
+from metrotenerife.forecast import load_schedule, merge_live, theoretical_passages
+from metrotenerife.models import Arrival
 from metrotenerife_demo.app import create_app
 
 CANARY = ZoneInfo("Atlantic/Canary")
@@ -102,6 +103,42 @@ def test_bands_cover_the_day_without_gaps() -> None:
     assert covered[-1][1] == 24
     for previous, current in zip(covered, covered[1:], strict=False):
         assert previous[1] == current[0]
+
+
+def _live_arrival(at: datetime, *, service: str = "405") -> Arrival:
+    return Arrival(
+        service=service,
+        stop_code="GRA",
+        stop_name="Gracia",
+        destination_code="TRI",
+        destination_name="La Trinidad",
+        line=1,
+        direction=1,
+        minutes=0,
+        updated_at=at,
+    )
+
+
+def test_live_passage_replaces_at_most_one_forecast() -> None:
+    """Intervalo de 5 min, previstos 08:00 y 08:05, real 08:02:30: queda un previsto."""
+    catalog = load_catalog()
+    start = datetime(2026, 11, 23, 7, 58, tzinfo=CANARY)
+    end = datetime(2026, 11, 23, 8, 8, tzinfo=CANARY)
+    forecast = theoretical_passages(catalog, "GRA", start=start, end=end, direction=1, line=1)
+    assert [item.at.strftime("%H:%M") for item in forecast] == ["08:00", "08:05"]
+
+    # A la misma distancia de los dos, cae el anterior: un tranvía con retraso
+    # es más normal que uno adelantado.
+    real = datetime(2026, 11, 23, 8, 2, 30, tzinfo=CANARY)
+    merged = merge_live(forecast, [_live_arrival(real)], start=start, end=end)
+    assert [(item.at.strftime("%H:%M:%S"), item.kind) for item in merged] == [
+        ("08:02:30", "en_vivo"),
+        ("08:05:00", "previsto"),
+    ]
+
+    two_live = [_live_arrival(real), _live_arrival(real, service="406")]
+    merged = merge_live(forecast, two_live, start=start, end=end)
+    assert [item.kind for item in merged] == ["en_vivo", "en_vivo"]
 
 
 async def test_demo_forecast_is_theoretical_tomorrow_and_mixes_live_now(api) -> None:

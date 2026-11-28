@@ -1,5 +1,6 @@
 """Tiempos en vivo del Tranvía de Tenerife y punto de extensión para otros operadores."""
 
+from metrotenerife._version import __version__
 from metrotenerife.catalog import Catalog, load_catalog
 from metrotenerife.client import TranviaOnlineClient, filter_arrivals
 from metrotenerife.errors import (
@@ -20,8 +21,6 @@ from metrotenerife.operators import (
     TransitOperator,
     TranviaOperator,
 )
-
-__version__ = "0.1.0"
 
 __all__ = [
     "AVISO_CATALOGO",

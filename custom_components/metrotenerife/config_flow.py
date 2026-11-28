@@ -28,15 +28,7 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
-from .vendor_bootstrap import bootstrap
-
-bootstrap()
-
-from metrotenerife import load_catalog  # noqa: E402
-from metrotenerife.models import Stop, direction_label  # noqa: E402
-from metrotenerife.text import fold  # noqa: E402
-
-from .const import (  # noqa: E402
+from .const import (
     CONF_DIRECTION,
     CONF_LINES,
     CONF_NAME,
@@ -52,11 +44,13 @@ from .const import (  # noqa: E402
     MIN_SCAN_INTERVAL_SECONDS,
     SUBENTRY_TYPE_STOP,
 )
+from .vendor.metrotenerife import Catalog, load_catalog
+from .vendor.metrotenerife.models import Stop, direction_label
+from .vendor.metrotenerife.text import fold
 
 
-def _matches(query: str) -> list[Stop]:
+def _matches(catalog: Catalog, query: str) -> list[Stop]:
     """Código exacto, id GTFS o búsqueda por nombre."""
-    catalog = load_catalog()
     text = query.strip()
     direct = catalog.get(text)
     if direct is not None and (
@@ -183,11 +177,15 @@ class StopSubentryFlow(ConfigSubentryFlow):
         self._matches: list[Stop] = []
         self._stop: Stop | None = None
 
+    async def _catalog(self) -> Catalog:
+        """El catálogo se lee del disco la primera vez; se hace fuera del event loop."""
+        return await self.hass.async_add_executor_job(load_catalog)
+
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
             query = str(user_input.get(CONF_QUERY) or "").strip()
-            matches = _matches(query) if query else []
+            matches = _matches(await self._catalog(), query) if query else []
             if not matches:
                 errors[CONF_QUERY] = "stop_not_found"
             elif len(matches) == 1:
@@ -244,7 +242,7 @@ class StopSubentryFlow(ConfigSubentryFlow):
             self._get_reconfigure_subentry() if self.source == SOURCE_RECONFIGURE else None
         )
         if self._stop is None and reconfigure is not None:
-            catalog = load_catalog()
+            catalog = await self._catalog()
             code = str(reconfigure.data[CONF_STOP_CODE])
             self._stop = catalog.get(code)
         if self._stop is None:

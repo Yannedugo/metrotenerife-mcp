@@ -10,20 +10,16 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .vendor_bootstrap import bootstrap
-
-bootstrap()
-
-from metrotenerife import TranviaOnlineClient  # noqa: E402
-
-from .const import (  # noqa: E402
+from .const import (
     CACHE_TTL_SECONDS,
     HTTP_TIMEOUT_SECONDS,
     MIN_REQUEST_INTERVAL_SECONDS,
     SUBENTRY_TYPE_STOP,
     USER_AGENT,
 )
-from .coordinator import TranviaCoordinator  # noqa: E402
+from .coordinator import TranviaCoordinator
+from .vendor.metrotenerife import TranviaOnlineClient, load_catalog
+from .vendor.metrotenerife.forecast import load_schedule
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,6 +45,10 @@ def _has_stops(entry: ConfigEntry) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: MetrotenerifeConfigEntry) -> bool:
     """Crea el cliente y, si hay paradas, hace la primera lectura."""
+    # El catálogo y la tabla de frecuencias se leen del disco una vez, fuera
+    # del event loop. Después quedan en memoria para sensores y previsión.
+    catalog = await hass.async_add_executor_job(load_catalog)
+    schedule = await hass.async_add_executor_job(load_schedule)
     session = async_get_clientsession(hass)
     client = TranviaOnlineClient(
         session,
@@ -57,7 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MetrotenerifeConfigEntry
         min_interval=MIN_REQUEST_INTERVAL_SECONDS,
         user_agent=USER_AGENT,
     )
-    coordinator = TranviaCoordinator(hass, entry, client)
+    coordinator = TranviaCoordinator(hass, entry, client, catalog=catalog, schedule=schedule)
     entry.runtime_data = MetrotenerifeRuntimeData(client=client, coordinator=coordinator)
 
     # Sin paradas no hace falta sondear. La primera parada recarga la entrada.

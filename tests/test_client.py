@@ -186,6 +186,24 @@ async def test_broken_items_are_skipped_until_none_remain() -> None:
         parse_arrivals({"inesperado": 1})
 
 
+def test_negative_minutes_are_an_empty_stop_not_a_parse_error() -> None:
+    """Una fila legible con minutos negativos es un tranvía que ya pasó."""
+    gone = {
+        "service": "7",
+        "stop": "INT",
+        "destinationStop": "TRI",
+        "route": 1,
+        "direction": 1,
+        "remainingMinutes": -2,
+        "lastUpdate": 1795356414000,
+    }
+    assert parse_arrivals([gone]) == []
+    coming = gone | {"service": "8", "remainingMinutes": 4}
+    assert [item.service for item in parse_arrivals([gone, coming])] == ["8"]
+    with pytest.raises(ParseError):
+        parse_arrivals([gone | {"route": "no es un número"}])
+
+
 def test_occupancy_drops_stale_rows(fixture) -> None:
     vehicles = parse_vehicles(fixture("vehicle_location.json"))
     fresh, stale = parse_occupancy(

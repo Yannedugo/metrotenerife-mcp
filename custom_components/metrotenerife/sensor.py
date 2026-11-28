@@ -11,12 +11,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from metrotenerife import Arrival
-from metrotenerife.catalog import load_catalog
-from metrotenerife.forecast import forecast_attributes
-from metrotenerife.models import direction_label
-from metrotenerife.occupancy import OCCUPANCY_MEANING
-
 from . import MetrotenerifeConfigEntry
 from .const import (
     CONF_DIRECTION,
@@ -28,6 +22,10 @@ from .const import (
 )
 from .coordinator import TranviaCoordinator
 from .entity import MetrotenerifeStopEntity
+from .vendor.metrotenerife import Arrival
+from .vendor.metrotenerife.forecast import forecast_attributes
+from .vendor.metrotenerife.models import direction_label
+from .vendor.metrotenerife.occupancy import OCCUPANCY_MEANING
 
 PARALLEL_UPDATES = 0
 
@@ -75,7 +73,6 @@ async def async_setup_entry(
                 subentry.title,
                 str(subentry.data[CONF_STOP_CODE]),
                 1,
-                "second_tram",
             ),
             FollowingTramSensor(
                 coordinator,
@@ -83,7 +80,6 @@ async def async_setup_entry(
                 subentry.title,
                 str(subentry.data[CONF_STOP_CODE]),
                 2,
-                "third_tram",
             ),
             MinutesSensor(
                 coordinator,
@@ -144,18 +140,21 @@ def _arrival_attribute(arrival: Arrival) -> dict[str, Any]:
     }
 
 
-def _forecast_attribute(subentry: Any, arrivals: list[Arrival]) -> list[dict[str, object]]:
-    """Hasta ocho pasos de las próximas dos horas. No llama a la red."""
+def _forecast_attribute(
+    coordinator: TranviaCoordinator, subentry: Any, arrivals: list[Arrival]
+) -> list[dict[str, object]]:
+    """Hasta ocho pasos de las próximas dos horas. No llama a la red ni lee disco."""
     raw_direction = subentry.data.get(CONF_DIRECTION)
     direction = int(raw_direction) if raw_direction else None
     lines = tuple(int(line) for line in subentry.data.get(CONF_LINES) or ())
     return forecast_attributes(
-        load_catalog(),
+        coordinator.catalog,
         str(subentry.data.get(CONF_STOP_CODE) or ""),
         arrivals,
         datetime.now(UTC),
         lines=lines,
         direction=direction,
+        schedule=coordinator.schedule,
     )
 
 
@@ -251,7 +250,7 @@ class NextTramSensor(_StopSensor):
             "occupancy_meaning": OCCUPANCY_MEANING,
             "arrivals_count": len(arrivals),
             "arrivals": [_arrival_attribute(item) for item in arrivals[:MAX_ARRIVALS_ATTRIBUTE]],
-            "forecast": _forecast_attribute(subentry, arrivals),
+            "forecast": _forecast_attribute(self.coordinator, subentry, arrivals),
             "source_updated_at": arrival.updated_at.isoformat() if arrival else None,
             "fetched_at": data.fetched_at.isoformat() if data else None,
         }
@@ -263,6 +262,9 @@ class FollowingTramSensor(_StopSensor):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_icon = "mdi:tram"
 
+    # Índice dentro del grupo de llegadas y clave de traducción que le corresponde.
+    KEYS = {1: "second_tram", 2: "third_tram"}
+
     def __init__(
         self,
         coordinator: TranviaCoordinator,
@@ -270,13 +272,13 @@ class FollowingTramSensor(_StopSensor):
         title: str,
         stop_code: str,
         index: int,
-        translation_key: str,
     ) -> None:
         super().__init__(coordinator, subentry_id, title, stop_code)
+        if index not in self.KEYS:
+            raise ValueError(f"El índice tiene que ser uno de {sorted(self.KEYS)}, no {index}.")
         self._index = index
-        self._attr_translation_key = translation_key
-        suffix = "second_tram" if index == 1 else "third_tram"
-        self._attr_unique_id = f"{subentry_id}_{suffix}"
+        self._attr_translation_key = self.KEYS[index]
+        self._attr_unique_id = f"{subentry_id}_{self.KEYS[index]}"
 
     @property
     def native_value(self) -> datetime | None:

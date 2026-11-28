@@ -7,6 +7,7 @@ import tomllib
 from pathlib import Path
 
 from metrotenerife import __version__
+from metrotenerife.client import USER_AGENT
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,6 +29,7 @@ def test_versions_match() -> None:
     const = (ROOT / "custom_components/metrotenerife/const.py").read_text(encoding="utf-8")
     assert manifest["version"] == __version__ == pyproject["project"]["version"]
     assert f'VERSION = "{__version__}"' in const
+    assert USER_AGENT.startswith(f"metrotenerife/{__version__} (")
     keys = list(manifest)
     assert keys[:2] == ["domain", "name"]
     assert keys[2:] == sorted(keys[2:])

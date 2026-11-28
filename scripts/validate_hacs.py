@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Comprueba la estructura que HACS exige a una integración.
 
-La action oficial de HACS rechaza los repositorios privados antes de mirar
-el código. Este script cubre esas comprobaciones en local y en CI.
+Es una comprobación rápida y sin red para local y CI. La action oficial de
+HACS hace la validación completa.
 """
 
 from __future__ import annotations
