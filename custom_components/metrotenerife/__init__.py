@@ -10,21 +10,16 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .vendor_bootstrap import bootstrap
-
-bootstrap()
-
-from metrotenerife import TranviaOnlineClient, load_catalog  # noqa: E402
-from metrotenerife.forecast import load_schedule  # noqa: E402
-
-from .const import (  # noqa: E402
+from .const import (
     CACHE_TTL_SECONDS,
     HTTP_TIMEOUT_SECONDS,
     MIN_REQUEST_INTERVAL_SECONDS,
     SUBENTRY_TYPE_STOP,
     USER_AGENT,
 )
-from .coordinator import TranviaCoordinator  # noqa: E402
+from .coordinator import TranviaCoordinator
+from .vendor.metrotenerife import TranviaOnlineClient, load_catalog
+from .vendor.metrotenerife.forecast import load_schedule
 
 _LOGGER = logging.getLogger(__name__)
 

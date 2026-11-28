@@ -13,8 +13,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from metrotenerife.catalog import Catalog
-from metrotenerife.models import Arrival, Direction
+from .catalog import Catalog
+from .models import Arrival, Direction
 
 CANARY = ZoneInfo("Atlantic/Canary")
 LIVE_HORIZON = timedelta(minutes=30)

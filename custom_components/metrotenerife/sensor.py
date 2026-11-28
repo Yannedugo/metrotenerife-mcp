@@ -11,11 +11,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from metrotenerife import Arrival
-from metrotenerife.forecast import forecast_attributes
-from metrotenerife.models import direction_label
-from metrotenerife.occupancy import OCCUPANCY_MEANING
-
 from . import MetrotenerifeConfigEntry
 from .const import (
     CONF_DIRECTION,
@@ -27,6 +22,10 @@ from .const import (
 )
 from .coordinator import TranviaCoordinator
 from .entity import MetrotenerifeStopEntity
+from .vendor.metrotenerife import Arrival
+from .vendor.metrotenerife.forecast import forecast_attributes
+from .vendor.metrotenerife.models import direction_label
+from .vendor.metrotenerife.occupancy import OCCUPANCY_MEANING
 
 PARALLEL_UPDATES = 0
 

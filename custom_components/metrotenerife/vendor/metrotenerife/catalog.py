@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from metrotenerife.models import Direction, Line, Stop
-from metrotenerife.text import fold
+from .models import Direction, Line, Stop
+from .text import fold
 
 _CATALOG_PATH = Path(__file__).resolve().parent / "data" / "catalog.json"
 _CACHED: Catalog | None = None

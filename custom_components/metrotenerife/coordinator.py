@@ -14,11 +14,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from metrotenerife import Arrival, Catalog, TranviaOnlineClient, filter_arrivals
-from metrotenerife.errors import MetrotenerifeError
-from metrotenerife.forecast import Schedule
-from metrotenerife.operators import compose_board, label_arrival
-
 from .const import (
     CONF_DIRECTION,
     CONF_LINES,
@@ -31,6 +26,10 @@ from .const import (
     MIN_SCAN_INTERVAL_SECONDS,
     POLL_JITTER_SECONDS,
 )
+from .vendor.metrotenerife import Arrival, Catalog, TranviaOnlineClient, filter_arrivals
+from .vendor.metrotenerife.errors import MetrotenerifeError
+from .vendor.metrotenerife.forecast import Schedule
+from .vendor.metrotenerife.operators import compose_board, label_arrival
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -155,7 +155,7 @@ python3 scripts/sync_vendor.py --check
 python3 -m pytest -q
 ```
 
-Los tests no llaman a TranvíaOnline: usan respuestas grabadas. Si tocas `src/metrotenerife`, ejecuta `python3 scripts/sync_vendor.py` para copiar la librería dentro de la integración. No subas un volcado histórico del feed en vivo.
+Los tests no llaman a TranvíaOnline: usan respuestas grabadas. Si tocas `src/metrotenerife`, ejecuta `python3 scripts/sync_vendor.py` para copiar la librería dentro de la integración; la copia es un subpaquete de la integración y el script convierte sus importaciones en relativas. No subas un volcado histórico del feed en vivo.
 
 ## Licencia
 

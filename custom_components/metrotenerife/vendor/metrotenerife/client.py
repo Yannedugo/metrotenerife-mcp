@@ -23,16 +23,16 @@ from zoneinfo import ZoneInfo
 import aiohttp
 import certifi
 
-from metrotenerife._version import __version__
-from metrotenerife.errors import (
+from ._version import __version__
+from .errors import (
     HttpStatusError,
     ParseError,
     RequestTimeoutError,
     StopNotFoundError,
     TransportError,
 )
-from metrotenerife.models import Arrival, Occupancy, Vehicle, VehicleSnapshot
-from metrotenerife.occupancy import HIGH_CARGA, normalize_carga
+from .models import Arrival, Occupancy, Vehicle, VehicleSnapshot
+from .occupancy import HIGH_CARGA, normalize_carga
 
 logger = logging.getLogger(__name__)
 
@@ -452,13 +452,13 @@ def filter_arrivals(
 
 
 def fold_destination(destination: str | None) -> str:
-    from metrotenerife.text import fold
+    from .text import fold
 
     return fold(destination or "")
 
 
 def _destination_matches(arrival: Arrival, folded_destination: str) -> bool:
-    from metrotenerife.text import fold
+    from .text import fold
 
     code = fold(arrival.destination_code)
     name = fold(arrival.destination_name)

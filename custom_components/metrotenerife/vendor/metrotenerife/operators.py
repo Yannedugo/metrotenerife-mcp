@@ -10,16 +10,16 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Protocol
 
-from metrotenerife.catalog import Catalog, load_catalog
-from metrotenerife.client import TranviaOnlineClient, filter_arrivals
-from metrotenerife.errors import (
+from .catalog import Catalog, load_catalog
+from .client import TranviaOnlineClient, filter_arrivals
+from .errors import (
     AmbiguousStopError,
     MetrotenerifeError,
     OperatorNotFoundError,
     StopNotFoundError,
 )
-from metrotenerife.estimate import limit_per_direction
-from metrotenerife.forecast import (
+from .estimate import limit_per_direction
+from .forecast import (
     AVISO_PREVISTO,
     Passage,
     load_schedule,
@@ -28,7 +28,7 @@ from metrotenerife.forecast import (
     theoretical_passages,
     wants_live,
 )
-from metrotenerife.models import (
+from .models import (
     Arrival,
     Line,
     Occupancy,
@@ -37,8 +37,8 @@ from metrotenerife.models import (
     VehiclePosition,
     VehicleSnapshot,
 )
-from metrotenerife.occupancy import HIGH_CARGA, normalize_carga
-from metrotenerife.text import fold
+from .occupancy import HIGH_CARGA, normalize_carga
+from .text import fold
 
 AVISO_EN_VIVO = (
     "Datos en vivo de TranvíaOnline (fuente no oficial de Metrotenerife). "

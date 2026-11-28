@@ -9,10 +9,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from metrotenerife.forecast import Passage, load_schedule
-from metrotenerife.models import Arrival, Stop, Vehicle, VehiclePosition, direction_label
-from metrotenerife.occupancy import OCCUPANCY_MEANING, occupancy_texts
-from metrotenerife.operators import AVISO_CATALOGO, AVISO_EN_VIVO, VehicleQuery
+from .forecast import Passage, load_schedule
+from .models import Arrival, Stop, Vehicle, VehiclePosition, direction_label
+from .occupancy import OCCUPANCY_MEANING, occupancy_texts
+from .operators import AVISO_CATALOGO, AVISO_EN_VIVO, VehicleQuery
 
 
 def stop_payload(stop: Stop) -> dict[str, Any]:

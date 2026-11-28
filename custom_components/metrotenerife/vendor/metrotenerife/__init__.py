@@ -1,9 +1,9 @@
 """Tiempos en vivo del Tranvía de Tenerife y punto de extensión para otros operadores."""
 
-from metrotenerife._version import __version__
-from metrotenerife.catalog import Catalog, load_catalog
-from metrotenerife.client import TranviaOnlineClient, filter_arrivals
-from metrotenerife.errors import (
+from ._version import __version__
+from .catalog import Catalog, load_catalog
+from .client import TranviaOnlineClient, filter_arrivals
+from .errors import (
     AmbiguousStopError,
     HttpStatusError,
     MetrotenerifeError,
@@ -13,8 +13,8 @@ from metrotenerife.errors import (
     StopNotFoundError,
     TransportError,
 )
-from metrotenerife.models import Arrival, Line, Stop, Vehicle, VehicleSnapshot
-from metrotenerife.operators import (
+from .models import Arrival, Line, Stop, Vehicle, VehicleSnapshot
+from .operators import (
     AVISO_CATALOGO,
     AVISO_EN_VIVO,
     OperatorRegistry,
