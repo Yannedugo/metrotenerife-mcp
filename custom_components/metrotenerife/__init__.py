@@ -14,7 +14,8 @@ from .vendor_bootstrap import bootstrap
 
 bootstrap()
 
-from metrotenerife import TranviaOnlineClient  # noqa: E402
+from metrotenerife import TranviaOnlineClient, load_catalog  # noqa: E402
+from metrotenerife.forecast import load_schedule  # noqa: E402
 
 from .const import (  # noqa: E402
     CACHE_TTL_SECONDS,
@@ -49,6 +50,10 @@ def _has_stops(entry: ConfigEntry) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: MetrotenerifeConfigEntry) -> bool:
     """Crea el cliente y, si hay paradas, hace la primera lectura."""
+    # El catálogo y la tabla de frecuencias se leen del disco una vez, fuera
+    # del event loop. Después quedan en memoria para sensores y previsión.
+    catalog = await hass.async_add_executor_job(load_catalog)
+    schedule = await hass.async_add_executor_job(load_schedule)
     session = async_get_clientsession(hass)
     client = TranviaOnlineClient(
         session,
@@ -57,7 +62,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MetrotenerifeConfigEntry
         min_interval=MIN_REQUEST_INTERVAL_SECONDS,
         user_agent=USER_AGENT,
     )
-    coordinator = TranviaCoordinator(hass, entry, client)
+    coordinator = TranviaCoordinator(hass, entry, client, catalog=catalog, schedule=schedule)
     entry.runtime_data = MetrotenerifeRuntimeData(client=client, coordinator=coordinator)
 
     # Sin paradas no hace falta sondear. La primera parada recarga la entrada.

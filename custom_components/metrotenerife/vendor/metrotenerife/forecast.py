@@ -200,8 +200,13 @@ def forecast_attributes(
     direction: int | None = None,
     limit: int = 8,
     horizon_minutes: int = 120,
+    schedule: Schedule | None = None,
 ) -> list[dict[str, object]]:
-    """Próximos pasos para un atributo de Home Assistant. Como mucho `limit`."""
+    """Próximos pasos para un atributo de Home Assistant. Como mucho `limit`.
+
+    Con `schedule` ya cargado no se toca el disco; sin él se usa la tabla
+    embebida.
+    """
     start = now.astimezone(CANARY)
     end = start + timedelta(minutes=horizon_minutes)
     only_line = lines[0] if len(lines) == 1 else None
@@ -212,6 +217,7 @@ def forecast_attributes(
         end=end,
         line=only_line,
         direction=direction,
+        schedule=schedule,
     )
     if len(lines) > 1:
         allowed = set(lines)

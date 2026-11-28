@@ -12,7 +12,6 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from metrotenerife import Arrival
-from metrotenerife.catalog import load_catalog
 from metrotenerife.forecast import forecast_attributes
 from metrotenerife.models import direction_label
 from metrotenerife.occupancy import OCCUPANCY_MEANING
@@ -142,18 +141,21 @@ def _arrival_attribute(arrival: Arrival) -> dict[str, Any]:
     }
 
 
-def _forecast_attribute(subentry: Any, arrivals: list[Arrival]) -> list[dict[str, object]]:
-    """Hasta ocho pasos de las próximas dos horas. No llama a la red."""
+def _forecast_attribute(
+    coordinator: TranviaCoordinator, subentry: Any, arrivals: list[Arrival]
+) -> list[dict[str, object]]:
+    """Hasta ocho pasos de las próximas dos horas. No llama a la red ni lee disco."""
     raw_direction = subentry.data.get(CONF_DIRECTION)
     direction = int(raw_direction) if raw_direction else None
     lines = tuple(int(line) for line in subentry.data.get(CONF_LINES) or ())
     return forecast_attributes(
-        load_catalog(),
+        coordinator.catalog,
         str(subentry.data.get(CONF_STOP_CODE) or ""),
         arrivals,
         datetime.now(UTC),
         lines=lines,
         direction=direction,
+        schedule=coordinator.schedule,
     )
 
 
@@ -249,7 +251,7 @@ class NextTramSensor(_StopSensor):
             "occupancy_meaning": OCCUPANCY_MEANING,
             "arrivals_count": len(arrivals),
             "arrivals": [_arrival_attribute(item) for item in arrivals[:MAX_ARRIVALS_ATTRIBUTE]],
-            "forecast": _forecast_attribute(subentry, arrivals),
+            "forecast": _forecast_attribute(self.coordinator, subentry, arrivals),
             "source_updated_at": arrival.updated_at.isoformat() if arrival else None,
             "fetched_at": data.fetched_at.isoformat() if data else None,
         }

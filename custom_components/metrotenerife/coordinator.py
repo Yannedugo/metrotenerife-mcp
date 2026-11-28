@@ -14,8 +14,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from metrotenerife import Arrival, TranviaOnlineClient, filter_arrivals, load_catalog
+from metrotenerife import Arrival, Catalog, TranviaOnlineClient, filter_arrivals
 from metrotenerife.errors import MetrotenerifeError
+from metrotenerife.forecast import Schedule
 from metrotenerife.operators import compose_board, label_arrival
 
 from .const import (
@@ -55,13 +56,24 @@ def scan_interval_seconds(entry: ConfigEntry) -> int:
 
 
 class TranviaCoordinator(DataUpdateCoordinator[NetworkSnapshot]):
-    """Lee `/api/infoStops/infoPanel` una vez por ciclo, para todas las paradas."""
+    """Lee `/api/infoStops/infoPanel` una vez por ciclo, para todas las paradas.
+
+    El catálogo y la tabla de frecuencias llegan ya cargados: aquí no se lee
+    el disco.
+    """
 
     def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, client: TranviaOnlineClient
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        client: TranviaOnlineClient,
+        *,
+        catalog: Catalog,
+        schedule: Schedule,
     ) -> None:
         self.client = client
-        self._catalog = load_catalog()
+        self.catalog = catalog
+        self.schedule = schedule
         self._last_manual_refresh = None
         super().__init__(
             hass,
@@ -105,11 +117,11 @@ class TranviaCoordinator(DataUpdateCoordinator[NetworkSnapshot]):
             vehicles = []
         labeled: dict[str, tuple[Arrival, ...]] = {}
         for code, arrivals in grouped.items():
-            named = [label_arrival(arrival, self._catalog) for arrival in arrivals]
+            named = [label_arrival(arrival, self.catalog) for arrival in arrivals]
             board, _notes = compose_board(
                 named,
                 vehicles,
-                self._catalog,
+                self.catalog,
                 per_direction=3,
                 now=fetched_at,
             )
