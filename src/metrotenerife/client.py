@@ -292,19 +292,25 @@ def normalize_stop_code(value: str) -> str:
 def parse_arrivals(payload: Any, *, now: datetime | None = None) -> list[Arrival]:
     """Convierte el JSON de un panel en llegadas.
 
-    Los elementos ilegibles se omiten. Si había elementos y ninguno vale, es
-    un cambio de formato, no una parada vacía.
+    Los elementos ilegibles se omiten. Si había elementos y ninguno se pudo
+    leer, es un cambio de formato, no una parada vacía. Una fila legible con
+    minutos negativos es un tranvía que ya pasó: se descarta sin error, así
+    que un panel con solo filas así es una parada sin tranvías.
     """
     items = _as_dicts(payload)
     if not items:
         return []
     moment = now or datetime.now(UTC)
     arrivals: list[Arrival] = []
+    readable = 0
     for item in items:
         arrival = _parse_arrival(item, moment)
-        if arrival is not None:
+        if arrival is None:
+            continue
+        readable += 1
+        if arrival.minutes >= 0:
             arrivals.append(arrival)
-    if not arrivals:
+    if not readable:
         raise ParseError()
     return arrivals
 
@@ -495,13 +501,18 @@ def _as_dicts(payload: Any) -> list[dict[str, Any]]:
 
 
 def _parse_arrival(item: dict[str, Any], now: datetime) -> Arrival | None:
+    """Una llegada, o None si la fila no tiene el formato esperado.
+
+    Los minutos negativos no son un fallo de formato: la fila se devuelve y
+    `parse_arrivals` decide qué hacer con ella.
+    """
     try:
         minutes = int(item["remainingMinutes"])
         line = int(item["route"])
         direction = int(item["direction"])
     except (KeyError, TypeError, ValueError):
         return None
-    if minutes < 0 or line <= 0 or direction <= 0:
+    if line <= 0 or direction <= 0:
         return None
     stop_code = str(item.get("stop") or "").strip().upper()
     destination_code = str(item.get("destinationStop") or "").strip().upper()
