@@ -28,7 +28,16 @@ from metrotenerife.forecast import (
     theoretical_passages,
     wants_live,
 )
-from metrotenerife.models import Arrival, Line, Stop, Vehicle, VehiclePosition, VehicleSnapshot
+from metrotenerife.models import (
+    Arrival,
+    Line,
+    Occupancy,
+    Stop,
+    Vehicle,
+    VehiclePosition,
+    VehicleSnapshot,
+)
+from metrotenerife.occupancy import HIGH_CARGA, normalize_carga
 from metrotenerife.text import fold
 
 AVISO_EN_VIVO = (
@@ -318,19 +327,14 @@ class VehicleQuery:
 def _describe_vehicle(
     number: int,
     *,
-    fresh: dict[str, object],
-    stale: tuple[object, ...],
+    fresh: dict[str, Occupancy],
+    stale: tuple[Occupancy, ...],
     located: list[Vehicle],
     fetched_at: datetime,
     occupancy_available: bool,
     position_available: bool,
 ) -> VehicleQuery:
-    from metrotenerife.models import Occupancy
-    from metrotenerife.occupancy import HIGH_CARGA, normalize_carga
-
-    fresh_rows = [
-        row for row in fresh.values() if isinstance(row, Occupancy) and row.vehicle_id == number
-    ]
+    fresh_rows = [row for row in fresh.values() if row.vehicle_id == number]
     fresh_rows.sort(key=lambda row: row.updated_at, reverse=True)
     by_service = {vehicle.service: vehicle for vehicle in located}
     located_by_number = [
@@ -399,7 +403,7 @@ def _describe_vehicle(
             vehicle=vehicle,
         )
 
-    stale_rows = [row for row in stale if isinstance(row, Occupancy) and row.vehicle_id == number]
+    stale_rows = [row for row in stale if row.vehicle_id == number]
     if stale_rows:
         newest = max(stale_rows, key=lambda row: row.updated_at)
         return VehicleQuery(
