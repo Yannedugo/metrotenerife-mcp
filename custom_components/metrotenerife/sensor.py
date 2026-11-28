@@ -75,7 +75,6 @@ async def async_setup_entry(
                 subentry.title,
                 str(subentry.data[CONF_STOP_CODE]),
                 1,
-                "second_tram",
             ),
             FollowingTramSensor(
                 coordinator,
@@ -83,7 +82,6 @@ async def async_setup_entry(
                 subentry.title,
                 str(subentry.data[CONF_STOP_CODE]),
                 2,
-                "third_tram",
             ),
             MinutesSensor(
                 coordinator,
@@ -263,6 +261,9 @@ class FollowingTramSensor(_StopSensor):
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _attr_icon = "mdi:tram"
 
+    # Índice dentro del grupo de llegadas y clave de traducción que le corresponde.
+    KEYS = {1: "second_tram", 2: "third_tram"}
+
     def __init__(
         self,
         coordinator: TranviaCoordinator,
@@ -270,13 +271,13 @@ class FollowingTramSensor(_StopSensor):
         title: str,
         stop_code: str,
         index: int,
-        translation_key: str,
     ) -> None:
         super().__init__(coordinator, subentry_id, title, stop_code)
+        if index not in self.KEYS:
+            raise ValueError(f"El índice tiene que ser uno de {sorted(self.KEYS)}, no {index}.")
         self._index = index
-        self._attr_translation_key = translation_key
-        suffix = "second_tram" if index == 1 else "third_tram"
-        self._attr_unique_id = f"{subentry_id}_{suffix}"
+        self._attr_translation_key = self.KEYS[index]
+        self._attr_unique_id = f"{subentry_id}_{self.KEYS[index]}"
 
     @property
     def native_value(self) -> datetime | None:
